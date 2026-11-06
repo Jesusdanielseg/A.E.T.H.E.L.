@@ -1,0 +1,17 @@
+#Entorno virtual de python
+.venv/
+
+#Archivos de configuracion y claves de API
+.env
+
+#Cache y archivos temporales de python
+__pycache__/
+*.pyc
+*.pyo
+
+#Archivos de log
+*.log
+
+#Ejercicios de practica python
+ejerciciosDePracticaPython_Fase01/
+Fase 01/
