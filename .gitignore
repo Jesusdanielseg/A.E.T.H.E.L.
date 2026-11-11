@@ -15,3 +15,7 @@ __pycache__/
 #Ejercicios de practica python
 ejerciciosDePracticaPython_Fase01/
 Fase 01/
+
+*.json
+
+*.csv
