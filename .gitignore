@@ -16,3 +16,9 @@ __pycache__/
 ejerciciosDePracticaPython_Fase01/
 Fase 01/
 
+# Bases de datos locales
+*.db
+*.sqlite
+*.sqlite3
+database/aethel.db
+
