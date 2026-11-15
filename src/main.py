@@ -2,17 +2,16 @@ import logging
 import sys
 from threading import Event
 
+from src.core.exceptions import CriticalError, RecoverableError
+from src.core.health import verificar_salud
 from src.core.lifecycle import LifecycleManager
+from src.core.logger import configurar_logging
 
 logger = logging.getLogger(__name__)
 
 
 def main() -> int:
     """Punto de entrada principal de A.E.T.H.E.L."""
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
-    )
     lifecycle = LifecycleManager()
     shutdown_event = Event()
 
@@ -23,7 +22,19 @@ def main() -> int:
     lifecycle.registrar_tarea_cierre(limpiar_prueba)
 
     try:
+        configurar_logging()
+        try:
+            verificar_salud(strict=True)
+        except RecoverableError as exc:
+            logger.warning("Comprobación de salud con error recuperable: %s", exc)
         lifecycle.iniciar()
+        while lifecycle.en_ejecucion:
+            shutdown_event.wait()
+    except CriticalError as exc:
+        logger.critical("Fallo crítico; A.E.T.H.E.L. no puede continuar: %s", exc)
+        return 1
+    except RecoverableError as exc:
+        logger.warning("Error recuperable durante el arranque: %s", exc)
         while lifecycle.en_ejecucion:
             shutdown_event.wait()
     except RuntimeError as exc:

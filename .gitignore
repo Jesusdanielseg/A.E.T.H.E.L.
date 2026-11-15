@@ -4,13 +4,30 @@
 #Archivos de configuracion y claves de API
 .env
 
-#Cache y archivos temporales de python
+#Cachés y archivos temporales
+.cache/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.pyright/
+.hypothesis/
+.tox/
+.nox/
+.coverage
+coverage.xml
+htmlcov/
+.dmypy.json
 __pycache__/
-*.pyc
-*.pyo
+*.py[cod]
+*$py.class
+.aethel-health-*
+#Cachés locales de editores
+.vscode/.ropeproject/
+.history/
 
 #Archivos de log
 *.log
+logs/
 
 #Ejercicios de practica python
 ejerciciosDePracticaPython_Fase01/
@@ -23,6 +40,7 @@ Fase 01/
 
 database/aethel.db
 
-.pytest_cache
-.ruff_cache
 *.lock
+
+# Apuntes y explicaciones locales
+explicaciones/
