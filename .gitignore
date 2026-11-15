@@ -20,5 +20,9 @@ Fase 01/
 *.db
 *.sqlite
 *.sqlite3
+
 database/aethel.db
 
+.pytest_cache
+.ruff_cache
+*.lock
