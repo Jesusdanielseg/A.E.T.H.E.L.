@@ -125,10 +125,13 @@ class LifecycleManager:
     def _manejar_senal(self, signum: int, _frame: FrameType | None) -> None:
         """Callback ejecutado por el SO al recibir una señal de terminación."""
         del _frame
+        if self._deteniendo:
+            return
         try:
             logger.info("Señal %s recibida; iniciando apagado ordenado", signum)
         finally:
             self.detener()
+        raise KeyboardInterrupt
 
     def iniciar(self) -> None:
         if self.en_ejecucion:

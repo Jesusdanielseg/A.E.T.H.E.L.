@@ -244,6 +244,29 @@ def test_signal_logging_failure_does_not_skip_shutdown(
     other_manager.detener()
 
 
+@pytest.mark.parametrize("signum", [signal.SIGINT, signal.SIGTERM])
+def test_termination_signal_stops_lifecycle_and_interrupts_blocking_input(
+    tmp_path,
+    monkeypatch: pytest.MonkeyPatch,
+    fake_signals: dict[int, SignalHandler],
+    signum: int,
+) -> None:
+    monkeypatch.setattr(lifecycle.config, "validar", lambda: True)
+    manager = lifecycle.LifecycleManager(tmp_path / "aethel.lock")
+    completed: list[str] = []
+    manager.registrar_tarea_cierre(lambda: completed.append("cleanup"))
+    manager.iniciar()
+
+    with pytest.raises(KeyboardInterrupt):
+        manager._manejar_senal(signum, None)
+
+    assert completed == ["cleanup"]
+    assert not manager.en_ejecucion
+    assert manager._lock_file is None
+    assert fake_signals[signal.SIGINT] == signal.SIG_DFL
+    assert fake_signals[signal.SIGTERM] == signal.SIG_DFL
+
+
 def test_context_manager_stops_on_exit_and_preserves_body_exception(
     tmp_path,
     monkeypatch: pytest.MonkeyPatch,

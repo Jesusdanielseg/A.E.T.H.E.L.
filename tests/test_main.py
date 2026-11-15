@@ -1,230 +1,219 @@
 import logging
-from threading import Event
 
 import pytest
 
 from src import main
-from src.core.exceptions import CriticalError, RecoverableError
+from src.core.exceptions import CriticalError
 
 
-def test_main_waits_for_shutdown_and_runs_cleanup(
-    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+def test_main_checks_health_then_starts_cli_and_stops(
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     events: list[str] = []
+    controller = object()
 
     class FakeLifecycle:
-        en_ejecucion = False
-
-        def registrar_tarea_cierre(self, task) -> None:
-            if not hasattr(self, "tasks"):
-                self.tasks = []
-            self.tasks.append(task)
+        def __init__(self) -> None:
+            events.append("construct lifecycle")
 
         def iniciar(self) -> None:
-            events.append("start")
-            self.en_ejecucion = True
+            events.append("start lifecycle")
 
         def detener(self) -> None:
-            if not self.en_ejecucion:
-                return
-            events.append("stop")
-            self.en_ejecucion = False
-            for task in reversed(self.tasks):
-                task()
+            events.append("stop lifecycle")
 
-    class FakeEvent:
-        def __init__(self) -> None:
-            self.event = Event()
+    class FakeCLI:
+        def __init__(self, received_controller: object) -> None:
+            assert received_controller is controller
+            events.append("construct cli")
 
-        def set(self) -> None:
-            events.append("wake")
-            self.event.set()
+        def ejecutar(self) -> None:
+            events.append("execute cli")
 
-        def wait(self) -> None:
-            events.append("wait")
-            lifecycle.detener()
-            self.event.wait()
-
-    lifecycle = FakeLifecycle()
-    monkeypatch.setattr(main, "Event", FakeEvent)
-    monkeypatch.setattr(main, "LifecycleManager", lambda: lifecycle)
-    configure_calls: list[bool] = []
-    monkeypatch.setattr(main, "configurar_logging", lambda: configure_calls.append(True))
-    health_calls: list[bool] = []
-
-    def verify_health(*, strict: bool) -> None:
-        health_calls.append(strict)
-
-    monkeypatch.setattr(main, "verificar_salud", verify_health)
-    caplog.set_level(logging.INFO)
+    monkeypatch.setattr(main, "configurar_logging", lambda: events.append("logging"))
+    monkeypatch.setattr(main, "LifecycleManager", FakeLifecycle)
+    monkeypatch.setattr(main, "ControladorCentral", lambda: controller)
+    monkeypatch.setattr(
+        main,
+        "InterfazCLI",
+        FakeCLI,
+    )
+    monkeypatch.setattr(
+        main,
+        "verificar_salud",
+        lambda *, strict: events.append(f"health strict={strict}"),
+    )
 
     assert main.main() == 0
-    assert configure_calls == [True]
-    assert health_calls == [True]
-    assert events == ["start", "wait", "stop", "wake"]
-    assert "Limpiando recursos temporales..." in caplog.text
+    assert events == [
+        "logging",
+        "construct lifecycle",
+        "construct cli",
+        "start lifecycle",
+        "health strict=True",
+        "execute cli",
+        "stop lifecycle",
+    ]
 
 
 @pytest.mark.parametrize(
-    ("error", "message"),
+    ("failure_stage", "error", "expected_return"),
     [
-        (RuntimeError("already running"), "already running"),
-        (ValueError("invalid configuration"), "invalid configuration"),
-        (OSError("lock file unavailable"), "lock file unavailable"),
+        ("health", CriticalError("health failed"), 1),
+        ("start", CriticalError("start failed"), 1),
+        ("start", RuntimeError("instance already active"), 1),
+        ("start", ValueError("invalid configuration"), 1),
+        ("start", OSError("lock file unavailable"), 1),
     ],
 )
-def test_main_reports_startup_errors_and_stops(
+def test_main_reports_startup_failure_and_always_stops(
     monkeypatch: pytest.MonkeyPatch,
     caplog: pytest.LogCaptureFixture,
+    failure_stage: str,
     error: Exception,
-    message: str,
+    expected_return: int,
 ) -> None:
     events: list[str] = []
 
     class FakeLifecycle:
-        en_ejecucion = False
-
-        def registrar_tarea_cierre(self, _task) -> None:
-            pass
-
         def iniciar(self) -> None:
             events.append("start")
-            raise error
+            if failure_stage == "start":
+                raise error
 
         def detener(self) -> None:
             events.append("stop")
 
-    monkeypatch.setattr(main, "LifecycleManager", FakeLifecycle)
+    class FakeCLI:
+        def __init__(self, _controller: object) -> None:
+            pass
+
+        def ejecutar(self) -> None:
+            events.append("execute cli")
+
+    def check_health(*, strict: bool) -> None:
+        assert strict
+        if failure_stage == "health":
+            raise error
+
     monkeypatch.setattr(main, "configurar_logging", lambda: None)
+    monkeypatch.setattr(main, "LifecycleManager", FakeLifecycle)
+    monkeypatch.setattr(main, "ControladorCentral", object)
+    monkeypatch.setattr(main, "InterfazCLI", FakeCLI)
+    monkeypatch.setattr(main, "verificar_salud", check_health)
+    caplog.set_level(logging.ERROR)
+
+    assert main.main() == expected_return
+    assert events[-1] == "stop"
+    assert str(error) in caplog.text
+
+
+def test_main_returns_error_if_logging_setup_fails(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    lifecycle_created = False
+
+    def fail_logging() -> None:
+        raise OSError("log directory unavailable")
+
+    def create_lifecycle():
+        nonlocal lifecycle_created
+        lifecycle_created = True
+        raise AssertionError("Lifecycle must not start when logging setup fails")
+
+    monkeypatch.setattr(main, "configurar_logging", fail_logging)
+    monkeypatch.setattr(main, "LifecycleManager", create_lifecycle)
+    caplog.set_level(logging.ERROR)
+
+    assert main.main() == 1
+    assert not lifecycle_created
+    assert "log directory unavailable" in caplog.text
+
+
+def test_main_returns_error_if_shutdown_fails(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    class FakeLifecycle:
+        def iniciar(self) -> None:
+            pass
+
+        def detener(self) -> None:
+            raise OSError("lock release failed")
+
+    class FakeCLI:
+        def __init__(self, _controller: object) -> None:
+            pass
+
+        def ejecutar(self) -> None:
+            pass
+
+    monkeypatch.setattr(main, "configurar_logging", lambda: None)
+    monkeypatch.setattr(main, "LifecycleManager", FakeLifecycle)
+    monkeypatch.setattr(main, "ControladorCentral", object)
+    monkeypatch.setattr(main, "InterfazCLI", FakeCLI)
     monkeypatch.setattr(main, "verificar_salud", lambda **_kwargs: None)
     caplog.set_level(logging.ERROR)
 
     assert main.main() == 1
-    assert events == ["start", "stop"]
-    assert message in caplog.text
+    assert "lock release failed" in caplog.text
 
 
-def test_main_does_not_miss_shutdown_before_wait(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    events: list[str] = []
-
-    class FakeLifecycle:
-        en_ejecucion = False
-
-        def registrar_tarea_cierre(self, task) -> None:
-            if not hasattr(self, "tasks"):
-                self.tasks = []
-            self.tasks.append(task)
-
-        def iniciar(self) -> None:
-            self.en_ejecucion = True
-            for task in reversed(self.tasks):
-                task()
-            self.en_ejecucion = False
-
-        def detener(self) -> None:
-            events.append("stop")
-
-    lifecycle = FakeLifecycle()
-    monkeypatch.setattr(main, "LifecycleManager", lambda: lifecycle)
-    monkeypatch.setattr(main, "configurar_logging", lambda: None)
-    monkeypatch.setattr(main, "verificar_salud", lambda **_kwargs: None)
-    real_event = Event
-
-    class AlreadySetEvent:
-        def __init__(self) -> None:
-            self.event = real_event()
-
-        def set(self) -> None:
-            self.event.set()
-
-        def wait(self) -> None:
-            events.append("wait")
-            assert self.event.is_set()
-
-    monkeypatch.setattr(main, "Event", AlreadySetEvent)
-
-    assert main.main() == 0
-    assert "wait" not in events
-    assert events == ["stop"]
-
-
-def test_main_stops_on_critical_health_error(
+def test_main_handles_signal_interrupt_as_clean_shutdown(
     monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:
     events: list[str] = []
 
     class FakeLifecycle:
-        en_ejecucion = False
+        def iniciar(self) -> None:
+            events.append("start")
+            raise KeyboardInterrupt
 
-        def registrar_tarea_cierre(self, _task) -> None:
+        def detener(self) -> None:
+            events.append("stop")
+
+    class FakeCLI:
+        def __init__(self, _controller: object) -> None:
             pass
 
-        def iniciar(self) -> None:
-            events.append("start")
+        def ejecutar(self) -> None:
+            pytest.fail("CLI should not run after an interrupted start")
 
-        def detener(self) -> None:
-            events.append("stop")
-
-    def fail_health(*, strict: bool) -> None:
-        assert strict
-        raise CriticalError("critical health failure")
-
+    monkeypatch.setattr(main, "configurar_logging", lambda: None)
     monkeypatch.setattr(main, "LifecycleManager", FakeLifecycle)
-    monkeypatch.setattr(main, "configurar_logging", lambda: None)
-    monkeypatch.setattr(main, "verificar_salud", fail_health)
-    caplog.set_level(logging.CRITICAL)
-
-    assert main.main() == 1
-    assert events == ["stop"]
-    assert "critical health failure" in caplog.text
-
-
-def test_main_continues_after_recoverable_health_error(
-    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
-) -> None:
-    events: list[str] = []
-
-    class FakeLifecycle:
-        en_ejecucion = False
-
-        def registrar_tarea_cierre(self, task) -> None:
-            if not hasattr(self, "tasks"):
-                self.tasks = []
-            self.tasks.append(task)
-
-        def iniciar(self) -> None:
-            events.append("start")
-            self.en_ejecucion = True
-
-        def detener(self) -> None:
-            if self.en_ejecucion:
-                events.append("stop")
-                self.en_ejecucion = False
-                for task in reversed(self.tasks):
-                    task()
-
-    lifecycle = FakeLifecycle()
-
-    class StopEvent:
-        def set(self) -> None:
-            events.append("wake")
-
-        def wait(self) -> None:
-            events.append("wait")
-            lifecycle.detener()
-
-    def fail_health(*, strict: bool) -> None:
-        assert strict
-        raise RecoverableError("temporary health check issue")
-
-    monkeypatch.setattr(main, "LifecycleManager", lambda: lifecycle)
-    monkeypatch.setattr(main, "Event", StopEvent)
-    monkeypatch.setattr(main, "configurar_logging", lambda: None)
-    monkeypatch.setattr(main, "verificar_salud", fail_health)
-    caplog.set_level(logging.WARNING)
+    monkeypatch.setattr(main, "ControladorCentral", object)
+    monkeypatch.setattr(main, "InterfazCLI", FakeCLI)
+    monkeypatch.setattr(main, "verificar_salud", lambda **_kwargs: None)
+    caplog.set_level(logging.INFO)
 
     assert main.main() == 0
-    assert events == ["start", "wait", "stop", "wake"]
-    assert "temporary health check issue" in caplog.text
+    assert events == ["start", "stop"]
+    assert "cierre ordenado" in caplog.text
+
+
+def test_main_preserves_unexpected_error_if_shutdown_also_fails(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    class FakeLifecycle:
+        def iniciar(self) -> None:
+            pass
+
+        def detener(self) -> None:
+            raise OSError("cleanup failure")
+
+    class FakeCLI:
+        def __init__(self, _controller: object) -> None:
+            pass
+
+        def ejecutar(self) -> None:
+            raise LookupError("unexpected cli failure")
+
+    monkeypatch.setattr(main, "configurar_logging", lambda: None)
+    monkeypatch.setattr(main, "LifecycleManager", FakeLifecycle)
+    monkeypatch.setattr(main, "ControladorCentral", object)
+    monkeypatch.setattr(main, "InterfazCLI", FakeCLI)
+    monkeypatch.setattr(main, "verificar_salud", lambda **_kwargs: None)
+
+    with pytest.raises(LookupError, match="unexpected cli failure"):
+        main.main()
+
+    assert "cleanup failure" in caplog.text
