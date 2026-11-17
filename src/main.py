@@ -1,11 +1,14 @@
 import logging
 import sys
 
+from src.core.config import config
 from src.core.controller import ControladorCentral
 from src.core.exceptions import CriticalError
 from src.core.health import verificar_salud
 from src.core.lifecycle import LifecycleManager
+from src.core.llm import GestorPresupuesto
 from src.core.logger import configurar_logging
+from src.infrastructure.gemini_client import GeminiClient
 from src.interfaces.cli import InterfazCLI
 
 logger = logging.getLogger(__name__)
@@ -23,10 +26,18 @@ def main() -> int:
     exit_code = 0
     try:
         lifecycle = LifecycleManager()
-        controlador = ControladorCentral()
+        verificar_salud(strict=True)
+        cliente_llm = GeminiClient(
+            modelo=config.AI_MODEL,
+            modelos_fallback=config.AI_FALLBACK_MODELS,
+        )
+        presupuesto = GestorPresupuesto(limite_usd=0.50)
+        controlador = ControladorCentral(
+            proveedor_llm=cliente_llm,
+            presupuesto=presupuesto,
+        )
         cli = InterfazCLI(controlador)
         lifecycle.iniciar()
-        verificar_salud(strict=True)
         cli.ejecutar()
     except KeyboardInterrupt:
         logger.info("Interrupción recibida; cierre ordenado")

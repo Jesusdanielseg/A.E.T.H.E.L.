@@ -6,7 +6,17 @@ import pytest
 from src.core import lifecycle
 from src.core.controller import ControladorCentral, MensajeEntrada, RespuestaSalida
 from src.core.exceptions import RecoverableError
+from src.core.llm import GestorPresupuesto, RespuestaLLM
 from src.interfaces.cli import InterfazCLI
+
+
+class FakeProvider:
+    def generar_respuesta(self, mensaje: str) -> RespuestaLLM:
+        return RespuestaLLM(mensaje, "test-model", 1, 1, 0.0)
+
+
+def _controller() -> ControladorCentral:
+    return ControladorCentral(FakeProvider(), GestorPresupuesto(1.0))
 
 
 def test_cli_sends_messages_until_exit_and_prints_traced_responses(
@@ -30,7 +40,9 @@ def test_cli_sends_messages_until_exit_and_prints_traced_responses(
     monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs))
     caplog.set_level(logging.INFO, logger="src.interfaces.cli")
 
-    InterfazCLI(FakeController()).ejecutar()
+    InterfazCLI(
+        FakeController(FakeProvider(), GestorPresupuesto(1.0))
+    ).ejecutar()
 
     output = capsys.readouterr().out
     assert "está listo" in output
@@ -62,7 +74,9 @@ def test_cli_warns_on_recoverable_error_and_continues(
     monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs))
     caplog.set_level(logging.WARNING, logger="src.interfaces.cli")
 
-    InterfazCLI(FakeController()).ejecutar()
+    InterfazCLI(
+        FakeController(FakeProvider(), GestorPresupuesto(1.0))
+    ).ejecutar()
 
     assert len(calls) == 2
     output = capsys.readouterr().out
@@ -82,7 +96,7 @@ def test_cli_exits_cleanly_on_keyboard_interrupt_or_eof(
 
     monkeypatch.setattr("builtins.input", interrupted_input)
 
-    InterfazCLI(ControladorCentral()).ejecutar()
+    InterfazCLI(_controller()).ejecutar()
 
     output = capsys.readouterr().out
     assert "está listo" in output
@@ -99,7 +113,9 @@ def test_cli_exit_commands_are_case_insensitive(
         def procesar_mensaje(self, _message: MensajeEntrada) -> RespuestaSalida:
             pytest.fail("No debe procesar el comando de salida")
 
-    InterfazCLI(UnexpectedController()).ejecutar()
+    InterfazCLI(
+        UnexpectedController(FakeProvider(), GestorPresupuesto(1.0))
+    ).ejecutar()
 
     assert "está listo" in capsys.readouterr().out
 
@@ -130,7 +146,7 @@ def test_termination_signal_during_input_exits_cli_and_releases_instance_lock(
         pytest.fail("The signal handler must interrupt input")
 
     monkeypatch.setattr("builtins.input", terminate_while_reading)
-    InterfazCLI(ControladorCentral()).ejecutar()
+    InterfazCLI(_controller()).ejecutar()
 
     assert not manager.en_ejecucion
     assert manager._lock_file is None

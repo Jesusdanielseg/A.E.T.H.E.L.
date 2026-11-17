@@ -46,8 +46,14 @@ class Settings:
         ).strip()
         self.AI_API_KEY: str = (os.getenv("AI_API_KEY", "") or "").strip()
         self.AI_MODEL: str = (
-            os.getenv("AI_MODEL", "gemini-1.5-flash") or "gemini-1.5-flash"
+            os.getenv("AI_MODEL", "gemini-3.8-flash") or "gemini-3.8-flash"
         ).strip()
+        fallbacks_raw = os.getenv("AI_FALLBACK_MODELS", "") or ""
+        self.AI_FALLBACK_MODELS: tuple[str, ...] = tuple(
+            modelo.strip()
+            for modelo in fallbacks_raw.split(",")
+            if modelo.strip()
+        )
 
     @property
     def is_development(self) -> bool:
@@ -92,6 +98,7 @@ class Settings:
             "AI_PROVIDER": self.AI_PROVIDER,
             "AI_API_KEY": "***" if self.AI_API_KEY else "",
             "AI_MODEL": self.AI_MODEL,
+            "AI_FALLBACK_MODELS": ",".join(self.AI_FALLBACK_MODELS),
         }
 
 
