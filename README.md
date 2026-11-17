@@ -8,9 +8,10 @@ control de presupuesto, integración con Gemini, registro de eventos y apagado
 ordenado.
 
 > **Estado actual:** `ping` se resuelve localmente sin consumir API. Los demás
-> mensajes se envían al proveedor Gemini configurado y registran tokens y
-> coste estimado. Las herramientas del sistema y la persistencia de
-> conversaciones todavía no están integradas.
+> mensajes usan el orden de proveedores configurado (Ollama, Gemini u offline)
+> y registran tokens, latencia y coste estimado. El contexto se mantiene en RAM
+> y se persiste en SQLite; las herramientas del sistema todavía no están
+> integradas.
 
 ## Funcionalidades implementadas
 
@@ -19,6 +20,10 @@ ordenado.
 - IDs de petición para correlacionar respuestas y registros.
 - Contrato `ProveedorLLM` desacoplado de Google mediante Clean Architecture.
 - Cliente Gemini con reintentos, timeout y modelos fallback configurables.
+- Router configurable con Gemini, Ollama local y proveedor offline.
+- Memoria conversacional híbrida RAM + SQLite con sesiones, compactación,
+  retención y cifrado Fernet opcional.
+- Comandos CLI `/modelo`, `/memoria` y `/limpiar`.
 - Presupuesto acumulado configurable; el valor actual de arranque es `$0.50`.
 - Logs en consola y en `logs/aethel.log`, con rotación y censura básica de
   claves reconocidas.
@@ -63,12 +68,23 @@ AI_PROVIDER=gemini
 AI_API_KEY=tu_clave_sin_comillas
 AI_MODEL=gemini-3.8-flash
 AI_FALLBACK_MODELS=gemini-3.5-flash-lite,gemini-3.1-flash-lite
+OLLAMA_URL=http://127.0.0.1:11434
+OLLAMA_MODEL=qwen3:8b
+OLLAMA_TIMEOUT_SECONDS=120
+LLM_PROVIDER_ORDER=ollama,gemini,offline
+CONTEXT_RETENTION_DAYS=30
+# Opcional: clave Fernet generada fuera del código
+CONTEXT_ENCRYPTION_KEY=
 ```
 
 `AI_FALLBACK_MODELS` es una lista separada por comas. Si el modelo principal
 responde con saturación, indisponibilidad o un error recuperable, el cliente
 intentará los modelos alternativos. No publiques claves ni agregues `.env` al
 repositorio. Si una clave se expone, revócala y genera otra.
+
+`LLM_PROVIDER_ORDER` controla el orden global de estrategias. Ollama no
+requiere una API key. `CONTEXT_ENCRYPTION_KEY` cifra el historial local; si se
+pierde, el historial no puede recuperarse.
 
 ## Ejecutar la interfaz
 
@@ -86,6 +102,9 @@ Prueba rápida:
 |---|---|
 | `ping` | `pong (núcleo operativo)` |
 | `Hola` | Respuesta generada por Gemini |
+| `/modelo` | Proveedor usado y latencia de la última consulta |
+| `/memoria` | Estado de la sesión y ventana activa |
+| `/limpiar` | Borra la memoria de la sesión actual |
 | Solo Enter | Aviso de que el mensaje no puede estar vacío; la CLI sigue activa |
 | `salir`, `exit` o `quit` | Cierre ordenado de la interfaz |
 
@@ -123,6 +142,16 @@ src/
 │   ├── health.py       # Comprobaciones de salud
 │   ├── lifecycle.py    # Candado, señales y apagado
 │   └── logger.py       # Logging e IDs de petición
+├── context/              # Memoria, sanitización y SQLite
+│   ├── manager.py
+│   ├── sanitizer.py
+│   └── store.py
+├── llm/                  # ABC, adaptadores y router
+│   ├── base.py
+│   ├── gemini_provider.py
+│   ├── ollama_provider.py
+│   ├── offline_provider.py
+│   └── router.py
 ├── infrastructure/
 │   └── gemini_client.py # Adaptador del proveedor Gemini
 ├── interfaces/
@@ -132,15 +161,16 @@ tests/                  # Pruebas automatizadas
 docs/                   # Notas de arquitectura y flujo previsto
 ```
 
-Hay directorios preparados para componentes futuros, como IA, memoria y
-herramientas; aún no forman parte del flujo funcional de la CLI.
+Hay directorios preparados para componentes futuros, como personalidad
+avanzada, herramientas y automatizaciones. La memoria y la abstracción LLM sí
+forman parte del flujo funcional actual.
 
 ## Próximos pasos
 
 1. Definir permisos y límites antes de habilitar herramientas que ejecuten
    acciones.
-2. Implementar persistencia de conversaciones y pruebas de integración.
-3. Actualizar los diagramas de arquitectura al conectar esos componentes.
+2. Añadir migraciones de esquema posteriores cuando evolucionen las tablas.
+3. Implementar herramientas con auditoría y confirmación explícita.
 
 ## Documentación adicional
 

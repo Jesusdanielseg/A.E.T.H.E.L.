@@ -54,9 +54,7 @@ def test_message_over_limit_raises_recoverable_error() -> None:
 def test_ping_returns_core_health_response(contenido: str) -> None:
     controlador = _controller()
 
-    respuesta = controlador.procesar_mensaje(
-        controller.MensajeEntrada(contenido)
-    )
+    respuesta = controlador.procesar_mensaje(controller.MensajeEntrada(contenido))
 
     assert respuesta.contenido == "pong (núcleo operativo)"
 
@@ -82,9 +80,7 @@ def test_message_contracts_are_immutable() -> None:
 
 
 def test_controller_uses_injected_llm_for_non_ping_messages() -> None:
-    controlador = controller.ControladorCentral(
-        FakeProvider(), GestorPresupuesto(1.0)
-    )
+    controlador = controller.ControladorCentral(FakeProvider(), GestorPresupuesto(1.0))
 
     respuesta = controlador.procesar_mensaje(controller.MensajeEntrada("hola"))
 

@@ -72,8 +72,6 @@ def test_llm_response_rejects_invalid_metrics(
     ("contenido", "modelo"),
     [("", "modelo-test"), ("respuesta", ""), ("   ", "modelo-test")],
 )
-def test_llm_response_requires_content_and_model(
-    contenido: str, modelo: str
-) -> None:
+def test_llm_response_requires_content_and_model(contenido: str, modelo: str) -> None:
     with pytest.raises(ValueError):
         RespuestaLLM(contenido, modelo, 0, 0, 0.0)

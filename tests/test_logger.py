@@ -35,13 +35,18 @@ def test_secret_filter_masks_configured_and_provider_keys(
         logging.ERROR,
         __file__,
         1,
-        "keys=%s %s %s",
-        ("my-private-key", "sk-openai_key-123", "AIzaGemini_key-456"),
+        "keys=%s %s %s %s",
+        (
+            "my-private-key",
+            "sk-openai_key-123",
+            "AIzaGemini_key-456",
+            "AQ.secret_header-789",
+        ),
         None,
     )
 
     assert logger.SecretMaskingFilter().filter(record)
-    assert record.getMessage() == "keys=*** *** ***"
+    assert record.getMessage() == "keys=*** *** *** ***"
     assert record.args == ()
 
 
@@ -145,9 +150,7 @@ def test_configure_logging_sets_request_id_masks_secrets_and_is_idempotent(
     )
 
     console_output = output.getvalue()
-    file_output = (project_dir / "logs" / "aethel.log").read_text(
-        encoding="utf-8"
-    )
+    file_output = (project_dir / "logs" / "aethel.log").read_text(encoding="utf-8")
     for log_output in (console_output, file_output):
         assert "[request-42]" in log_output
         assert "secret values: *** *** ***" in log_output

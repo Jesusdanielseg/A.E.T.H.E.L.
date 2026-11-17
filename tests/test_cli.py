@@ -40,9 +40,7 @@ def test_cli_sends_messages_until_exit_and_prints_traced_responses(
     monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs))
     caplog.set_level(logging.INFO, logger="src.interfaces.cli")
 
-    InterfazCLI(
-        FakeController(FakeProvider(), GestorPresupuesto(1.0))
-    ).ejecutar()
+    InterfazCLI(FakeController(FakeProvider(), GestorPresupuesto(1.0))).ejecutar()
 
     output = capsys.readouterr().out
     assert "está listo" in output
@@ -74,9 +72,7 @@ def test_cli_warns_on_recoverable_error_and_continues(
     monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs))
     caplog.set_level(logging.WARNING, logger="src.interfaces.cli")
 
-    InterfazCLI(
-        FakeController(FakeProvider(), GestorPresupuesto(1.0))
-    ).ejecutar()
+    InterfazCLI(FakeController(FakeProvider(), GestorPresupuesto(1.0))).ejecutar()
 
     assert len(calls) == 2
     output = capsys.readouterr().out
@@ -113,9 +109,7 @@ def test_cli_exit_commands_are_case_insensitive(
         def procesar_mensaje(self, _message: MensajeEntrada) -> RespuestaSalida:
             pytest.fail("No debe procesar el comando de salida")
 
-    InterfazCLI(
-        UnexpectedController(FakeProvider(), GestorPresupuesto(1.0))
-    ).ejecutar()
+    InterfazCLI(UnexpectedController(FakeProvider(), GestorPresupuesto(1.0))).ejecutar()
 
     assert "está listo" in capsys.readouterr().out
 

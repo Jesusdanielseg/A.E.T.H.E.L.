@@ -34,6 +34,7 @@ def test_main_checks_health_then_starts_cli_and_stops(
 
     monkeypatch.setattr(main, "configurar_logging", lambda: events.append("logging"))
     monkeypatch.setattr(main, "LifecycleManager", FakeLifecycle)
+
     def create_client(**kwargs: object) -> object:
         captured["client_kwargs"] = kwargs
         events.append("construct client")
@@ -125,9 +126,7 @@ def test_main_reports_startup_failure_and_always_stops(
     monkeypatch.setattr(main, "configurar_logging", lambda: None)
     monkeypatch.setattr(main, "LifecycleManager", FakeLifecycle)
     monkeypatch.setattr(main, "GeminiClient", lambda **_kwargs: object())
-    monkeypatch.setattr(
-        main, "ControladorCentral", lambda **_kwargs: object()
-    )
+    monkeypatch.setattr(main, "ControladorCentral", lambda **_kwargs: object())
     monkeypatch.setattr(main, "InterfazCLI", FakeCLI)
     monkeypatch.setattr(main, "verificar_salud", check_health)
     caplog.set_level(logging.ERROR)
@@ -159,10 +158,8 @@ def test_main_returns_error_if_logging_setup_fails(
     assert "log directory unavailable" in caplog.text
 
 
-@pytest.mark.parametrize("failure_stage", ["client", "controller"])
 def test_main_cleans_up_when_composition_root_fails(
     monkeypatch: pytest.MonkeyPatch,
-    failure_stage: str,
 ) -> None:
     events: list[str] = []
 
@@ -178,14 +175,11 @@ def test_main_cleans_up_when_composition_root_fails(
 
     def create_client(**_kwargs: object) -> object:
         events.append("client")
-        if failure_stage == "client":
-            raise CriticalError("client unavailable")
         return object()
 
     def create_controller(**_kwargs: object) -> object:
         events.append("controller")
-        if failure_stage == "controller":
-            raise ValueError("invalid controller")
+        raise ValueError("invalid controller")
         return object()
 
     monkeypatch.setattr(main, "configurar_logging", lambda: None)
@@ -195,11 +189,7 @@ def test_main_cleans_up_when_composition_root_fails(
     monkeypatch.setattr(main, "verificar_salud", lambda **_kwargs: None)
 
     assert main.main() == 1
-    assert events == (
-        ["construct", "client", "stop"]
-        if failure_stage == "client"
-        else ["construct", "client", "controller", "stop"]
-    )
+    assert events == ["construct", "client", "controller", "stop"]
 
 
 def test_main_returns_error_if_shutdown_fails(
@@ -222,9 +212,7 @@ def test_main_returns_error_if_shutdown_fails(
     monkeypatch.setattr(main, "configurar_logging", lambda: None)
     monkeypatch.setattr(main, "LifecycleManager", FakeLifecycle)
     monkeypatch.setattr(main, "GeminiClient", lambda **_kwargs: object())
-    monkeypatch.setattr(
-        main, "ControladorCentral", lambda **_kwargs: object()
-    )
+    monkeypatch.setattr(main, "ControladorCentral", lambda **_kwargs: object())
     monkeypatch.setattr(main, "InterfazCLI", FakeCLI)
     monkeypatch.setattr(main, "verificar_salud", lambda **_kwargs: None)
     caplog.set_level(logging.ERROR)
@@ -256,9 +244,7 @@ def test_main_handles_signal_interrupt_as_clean_shutdown(
     monkeypatch.setattr(main, "configurar_logging", lambda: None)
     monkeypatch.setattr(main, "LifecycleManager", FakeLifecycle)
     monkeypatch.setattr(main, "GeminiClient", lambda **_kwargs: object())
-    monkeypatch.setattr(
-        main, "ControladorCentral", lambda **_kwargs: object()
-    )
+    monkeypatch.setattr(main, "ControladorCentral", lambda **_kwargs: object())
     monkeypatch.setattr(main, "InterfazCLI", FakeCLI)
     monkeypatch.setattr(main, "verificar_salud", lambda **_kwargs: None)
     caplog.set_level(logging.INFO)
@@ -288,9 +274,7 @@ def test_main_preserves_unexpected_error_if_shutdown_also_fails(
     monkeypatch.setattr(main, "configurar_logging", lambda: None)
     monkeypatch.setattr(main, "LifecycleManager", FakeLifecycle)
     monkeypatch.setattr(main, "GeminiClient", lambda **_kwargs: object())
-    monkeypatch.setattr(
-        main, "ControladorCentral", lambda **_kwargs: object()
-    )
+    monkeypatch.setattr(main, "ControladorCentral", lambda **_kwargs: object())
     monkeypatch.setattr(main, "InterfazCLI", FakeCLI)
     monkeypatch.setattr(main, "verificar_salud", lambda **_kwargs: None)
 

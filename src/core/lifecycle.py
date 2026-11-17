@@ -73,7 +73,9 @@ class LifecycleManager:
                 lock_file.seek(0)
                 try:
                     msvcrt.locking(  # type: ignore[attr-defined]
-                        lock_file.fileno(), msvcrt.LK_NBLCK, 1  # type: ignore[attr-defined]
+                        lock_file.fileno(),
+                        msvcrt.LK_NBLCK,  # type: ignore[attr-defined]
+                        1,  # type: ignore[attr-defined]
                     )
                 except OSError as exc:
                     if exc.errno in {errno.EACCES, errno.EAGAIN, errno.EDEADLK}:
@@ -83,9 +85,7 @@ class LifecycleManager:
                     raise
             else:
                 try:
-                    fcntl.flock(
-                        lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB
-                    )
+                    fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
                 except BlockingIOError as exc:
                     raise RuntimeError(
                         "A.E.T.H.E.L. ya se encuentra en ejecución"

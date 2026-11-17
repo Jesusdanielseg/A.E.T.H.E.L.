@@ -9,6 +9,7 @@ from src.infrastructure import gemini_client
 def _client(
     monkeypatch: pytest.MonkeyPatch,
     responses: list[object],
+    modelo: str | None = "gemini-2.5-flash",
     timeout_segundos: int = 30,
     max_reintentos: int = 3,
     espera_base: float = 1.5,
@@ -29,7 +30,7 @@ def _client(
     monkeypatch.setattr(gemini_client.config, "AI_FALLBACK_MODELS", ())
     monkeypatch.setattr(gemini_client.genai, "Client", lambda **_kwargs: FakeClient())
     return gemini_client.GeminiClient(
-        modelo="gemini-2.5-flash",
+        modelo=modelo,
         timeout_segundos=timeout_segundos,
         max_reintentos=max_reintentos,
         espera_base=espera_base,
@@ -62,6 +63,18 @@ def test_gemini_client_builds_structured_response(
     assert response.tokens_entrada == 10
     assert response.tokens_salida == 5
     assert response.coste_usd == 0.000005
+
+
+def test_gemini_client_uses_configured_model_by_default(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(gemini_client.config, "AI_MODEL", "configured-model")
+    client = _client(monkeypatch, [_response("ok")], modelo=None)
+
+    response = client.generar_respuesta("hola")
+
+    assert client.modelo == "configured-model"
+    assert response.modelo == "configured-model"
 
 
 def test_gemini_client_retries_transient_api_errors(
@@ -172,9 +185,7 @@ def test_gemini_client_uses_fallback_after_transient_failure(
         models = FakeModels()
 
     monkeypatch.setattr(gemini_client.config, "AI_API_KEY", "test-key")
-    monkeypatch.setattr(
-        gemini_client.genai, "Client", lambda **_kwargs: FakeClient()
-    )
+    monkeypatch.setattr(gemini_client.genai, "Client", lambda **_kwargs: FakeClient())
     client = gemini_client.GeminiClient(
         modelo="primary",
         modelos_fallback=("fallback",),

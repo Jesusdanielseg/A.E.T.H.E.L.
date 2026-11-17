@@ -5,6 +5,7 @@ from typing import IO, ClassVar
 try:
     from dotenv import load_dotenv
 except ModuleNotFoundError:  # pragma: no cover
+
     def load_dotenv(
         dotenv_path: str | os.PathLike[str] | None = None,
         stream: IO[str] | None = None,
@@ -41,19 +42,43 @@ class Settings:
             db_path_obj = project_root / db_path_obj
         self.DB_PATH: str = str(db_path_obj.resolve())
 
-        self.AI_PROVIDER: str = (
-            os.getenv("AI_PROVIDER", "gemini") or "gemini"
-        ).strip()
+        self.AI_PROVIDER: str = (os.getenv("AI_PROVIDER", "gemini") or "gemini").strip()
         self.AI_API_KEY: str = (os.getenv("AI_API_KEY", "") or "").strip()
         self.AI_MODEL: str = (
             os.getenv("AI_MODEL", "gemini-3.8-flash") or "gemini-3.8-flash"
         ).strip()
         fallbacks_raw = os.getenv("AI_FALLBACK_MODELS", "") or ""
         self.AI_FALLBACK_MODELS: tuple[str, ...] = tuple(
-            modelo.strip()
-            for modelo in fallbacks_raw.split(",")
-            if modelo.strip()
+            modelo.strip() for modelo in fallbacks_raw.split(",") if modelo.strip()
         )
+        self.OLLAMA_URL: str = (
+            os.getenv("OLLAMA_URL", "http://127.0.0.1:11434")
+            or "http://127.0.0.1:11434"
+        ).strip()
+        self.OLLAMA_MODEL: str = (
+            os.getenv("OLLAMA_MODEL", "llama3.2") or "llama3.2"
+        ).strip()
+        ollama_timeout_raw = os.getenv("OLLAMA_TIMEOUT_SECONDS", "120") or "120"
+        try:
+            self.OLLAMA_TIMEOUT_SECONDS: int = int(ollama_timeout_raw)
+        except ValueError:
+            self.OLLAMA_TIMEOUT_SECONDS = 0
+        provider_order_raw = (
+            os.getenv("LLM_PROVIDER_ORDER", "gemini,ollama,offline") or ""
+        )
+        self.LLM_PROVIDER_ORDER: tuple[str, ...] = tuple(
+            provider.strip().lower()
+            for provider in provider_order_raw.split(",")
+            if provider.strip()
+        )
+        retention_raw = os.getenv("CONTEXT_RETENTION_DAYS", "30") or "30"
+        try:
+            self.CONTEXT_RETENTION_DAYS: int = int(retention_raw)
+        except ValueError:
+            self.CONTEXT_RETENTION_DAYS = 0
+        self.CONTEXT_ENCRYPTION_KEY: str = (
+            os.getenv("CONTEXT_ENCRYPTION_KEY", "") or ""
+        ).strip()
 
     @property
     def is_development(self) -> bool:
@@ -75,14 +100,30 @@ class Settings:
                 "Se espera development, production, test o local."
             )
 
-        if self.requires_api_key and not self.AI_API_KEY:
+        if (
+            self.requires_api_key
+            and "gemini" in self.LLM_PROVIDER_ORDER
+            and not self.AI_API_KEY
+        ):
             errores.append(f"Falta AI_API_KEY para el entorno '{self.ENVIRONMENT}'.")
 
         if not self.AI_PROVIDER:
             errores.append("AI_PROVIDER no puede estar vacío.")
 
-        if not self.AI_MODEL:
+        if "gemini" in self.LLM_PROVIDER_ORDER and not self.AI_MODEL:
             errores.append("AI_MODEL no puede estar vacío.")
+
+        if self.OLLAMA_TIMEOUT_SECONDS <= 0:
+            errores.append("OLLAMA_TIMEOUT_SECONDS debe ser mayor que cero.")
+
+        if self.CONTEXT_RETENTION_DAYS <= 0:
+            errores.append("CONTEXT_RETENTION_DAYS debe ser mayor que cero.")
+
+        valid_providers = {"gemini", "ollama", "offline"}
+        if not self.LLM_PROVIDER_ORDER or any(
+            provider not in valid_providers for provider in self.LLM_PROVIDER_ORDER
+        ):
+            errores.append("LLM_PROVIDER_ORDER debe contener gemini, ollama u offline.")
 
         if errores:
             raise ValueError("Error de configuración: " + "; ".join(errores))
@@ -99,6 +140,12 @@ class Settings:
             "AI_API_KEY": "***" if self.AI_API_KEY else "",
             "AI_MODEL": self.AI_MODEL,
             "AI_FALLBACK_MODELS": ",".join(self.AI_FALLBACK_MODELS),
+            "OLLAMA_URL": self.OLLAMA_URL,
+            "OLLAMA_MODEL": self.OLLAMA_MODEL,
+            "OLLAMA_TIMEOUT_SECONDS": str(self.OLLAMA_TIMEOUT_SECONDS),
+            "LLM_PROVIDER_ORDER": ",".join(self.LLM_PROVIDER_ORDER),
+            "CONTEXT_RETENTION_DAYS": str(self.CONTEXT_RETENTION_DAYS),
+            "CONTEXT_ENCRYPTION_KEY": "***" if self.CONTEXT_ENCRYPTION_KEY else "",
         }
 
 

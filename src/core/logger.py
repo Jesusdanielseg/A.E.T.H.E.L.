@@ -12,7 +12,9 @@ from src.core.config import config
 _request_id_ctx: ContextVar[str] = ContextVar("request_id", default="system")
 _HANDLER_MARKER = "_aethel_logging_handler"
 _REQUEST_ID_PATTERN = re.compile(r"[A-Za-z0-9._:-]{1,128}\Z")
-_SECRET_PATTERN = re.compile(r"(sk-[A-Za-z0-9_-]+|AIza[A-Za-z0-9_-]+)")
+_SECRET_PATTERN = re.compile(
+    r"(sk-[A-Za-z0-9_-]+|AIza[A-Za-z0-9_-]+|AQ\.[A-Za-z0-9_-]+)"
+)
 
 
 def _validar_request_id(request_id: str | None) -> str:

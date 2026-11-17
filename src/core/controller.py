@@ -1,6 +1,7 @@
 import logging
 from dataclasses import dataclass
 
+from src.context.manager import ContextManager
 from src.core.exceptions import RecoverableError
 from src.core.llm import GestorPresupuesto, ProveedorLLM
 from src.core.logger import establecer_request_id
@@ -34,9 +35,11 @@ class ControladorCentral:
         self,
         proveedor_llm: ProveedorLLM,
         presupuesto: GestorPresupuesto,
+        contexto: ContextManager | None = None,
     ) -> None:
         self.proveedor_llm = proveedor_llm
         self.presupuesto = presupuesto
+        self.contexto = contexto
 
     def procesar_mensaje(self, mensaje: MensajeEntrada) -> RespuestaSalida:
         """Ejecuta el flujo completo de atención para un mensaje entrante."""
@@ -52,8 +55,16 @@ class ControladorCentral:
             )
 
         self.presupuesto.verificar_disponibilidad()
-        respuesta_llm = self.proveedor_llm.generar_respuesta(texto_limpio)
+        if self.contexto is not None:
+            prompt = self.contexto.build_prompt(texto_limpio)
+            self.contexto.add_message("user", texto_limpio)
+        else:
+            prompt = texto_limpio
+        respuesta_llm = self.proveedor_llm.generar_respuesta(prompt)
         self.presupuesto.registrar_uso(respuesta_llm)
+        if self.contexto is not None:
+            self.contexto.add_message("assistant", respuesta_llm.contenido)
+            self.contexto.compact(self.proveedor_llm)
 
         logger.info(
             "Respuesta generada correctamente (%d caracteres)",

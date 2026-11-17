@@ -40,9 +40,7 @@ class GeminiClient:
         modelo_final = modelo if modelo is not None else config.AI_MODEL
         if not isinstance(modelo_final, str) or not modelo_final.strip():
             raise ValueError("El modelo de Gemini no puede estar vacío.")
-        if not isinstance(timeout_segundos, int) or isinstance(
-            timeout_segundos, bool
-        ):
+        if not isinstance(timeout_segundos, int) or isinstance(timeout_segundos, bool):
             raise TypeError("El timeout debe ser un entero.")
         if timeout_segundos <= 0:
             raise ValueError("El timeout debe ser mayor que cero.")
@@ -50,31 +48,23 @@ class GeminiClient:
             raise TypeError("max_reintentos debe ser un entero.")
         if max_reintentos < 1:
             raise ValueError("max_reintentos debe ser al menos 1.")
-        if not isinstance(espera_base, (int, float)) or isinstance(
-            espera_base, bool
-        ):
+        if not isinstance(espera_base, (int, float)) or isinstance(espera_base, bool):
             raise TypeError("La espera base debe ser numérica.")
         if not math.isfinite(espera_base) or espera_base < 0:
-            raise ValueError(
-                "La espera base debe ser un número finito no negativo."
-            )
+            raise ValueError("La espera base debe ser un número finito no negativo.")
         if not isinstance(espera_maxima, (int, float)) or isinstance(
             espera_maxima, bool
         ):
             raise TypeError("La espera máxima debe ser numérica.")
         if not math.isfinite(espera_maxima) or espera_maxima < 0:
-            raise ValueError(
-                "La espera máxima debe ser un número finito no negativo."
-            )
+            raise ValueError("La espera máxima debe ser un número finito no negativo.")
         if not isinstance(jitter, (int, float)) or isinstance(jitter, bool):
             raise TypeError("El jitter debe ser numérico.")
         if not math.isfinite(jitter) or jitter < 0:
             raise ValueError("El jitter debe ser un número finito no negativo.")
 
         fallbacks_configurados = (
-            config.AI_FALLBACK_MODELS
-            if modelos_fallback is None
-            else modelos_fallback
+            config.AI_FALLBACK_MODELS if modelos_fallback is None else modelos_fallback
         )
         fallbacks = tuple(modelo.strip() for modelo in fallbacks_configurados)
         if any(not modelo for modelo in fallbacks):
@@ -205,9 +195,7 @@ class GeminiClient:
             not isinstance(tokens, int) or isinstance(tokens, bool) or tokens < 0
             for tokens in (tokens_in, tokens_out)
         ):
-            raise ExternalServiceError(
-                "Gemini devolvió métricas de tokens inválidas."
-            )
+            raise ExternalServiceError("Gemini devolvió métricas de tokens inválidas.")
         return tokens_in, tokens_out
 
     def _esperar_reintento(self, intento: int, codigo: int | None) -> None:
@@ -215,8 +203,7 @@ class GeminiClient:
         espera = min(self.espera_base * (2**intento), self.espera_maxima)
         espera += random.uniform(0, self.jitter)
         logger.warning(
-            "Reintentando Gemini tras error %s (intento %d/%d); "
-            "espera %.2f segundos",
+            "Reintentando Gemini tras error %s (intento %d/%d); espera %.2f segundos",
             codigo if codigo is not None else "red",
             intento + 1,
             self.max_reintentos,

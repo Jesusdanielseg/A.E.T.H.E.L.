@@ -63,12 +63,13 @@ def verificar_salud(strict: bool = False) -> HealthReport:
     almacenamiento_escribible = _es_escribible(directorio_db)
     almacenamiento_con_espacio = _tiene_espacio_disco(directorio_db)
     logs_escribible = _es_escribible(directorio_logs)
-    api_key_disponible = bool(config.AI_API_KEY.strip())
+    cloud_provider_configured = "gemini" in config.LLM_PROVIDER_ORDER
+    api_key_disponible = (
+        bool(config.AI_API_KEY.strip()) if cloud_provider_configured else True
+    )
 
     componentes = {
-        "almacenamiento": (
-            almacenamiento_escribible and almacenamiento_con_espacio
-        ),
+        "almacenamiento": (almacenamiento_escribible and almacenamiento_con_espacio),
         "logs": logs_escribible,
         "api_key": api_key_disponible,
     }
@@ -83,7 +84,7 @@ def verificar_salud(strict: bool = False) -> HealthReport:
             )
         ),
         "logs": "OK" if logs_escribible else "Directorio de logs no escribible",
-        "api_key": "OK" if api_key_disponible else "AI_API_KEY no está configurada",
+        "api_key": ("OK" if api_key_disponible else "AI_API_KEY no está configurada"),
     }
 
     estado: HealthStatus
@@ -101,9 +102,7 @@ def verificar_salud(strict: bool = False) -> HealthReport:
     else:
         logger.error("Comprobación de salud: %s (%s)", estado, detalles)
         if strict:
-            raise CriticalError(
-                "Fallo crítico en comprobación de salud", str(detalles)
-            )
+            raise CriticalError("Fallo crítico en comprobación de salud", str(detalles))
 
     return HealthReport(
         estado=estado,

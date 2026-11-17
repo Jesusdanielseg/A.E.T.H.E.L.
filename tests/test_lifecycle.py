@@ -99,9 +99,7 @@ def test_start_rolls_back_lock_and_signals_when_registration_fails(
     other_manager = lifecycle.LifecycleManager(tmp_path / "aethel.lock")
     original_set_signal = signal.signal
 
-    def fail_sigterm_registration(
-        signum: int, handler: SignalHandler
-    ) -> SignalHandler:
+    def fail_sigterm_registration(signum: int, handler: SignalHandler) -> SignalHandler:
         if signum == signal.SIGTERM and handler == manager._manejar_senal:
             raise ValueError("signal registration failed")
         return original_set_signal(signum, handler)

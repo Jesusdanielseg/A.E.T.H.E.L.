@@ -67,6 +67,27 @@ def test_missing_api_key_degrades_without_raising(
     assert "degraded" in caplog.text
 
 
+def test_local_only_provider_does_not_require_cloud_api_key(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(health.config, "DB_PATH", str(tmp_path / "db" / "aethel.db"))
+    monkeypatch.setattr(health.config, "AI_API_KEY", "")
+    monkeypatch.setattr(health.config, "LLM_PROVIDER_ORDER", ("ollama", "offline"))
+    monkeypatch.setattr(health, "__file__", str(tmp_path / "src/core/health.py"))
+    monkeypatch.setattr(health.os, "access", lambda _path, _mode: True)
+    monkeypatch.setattr(
+        health.shutil,
+        "disk_usage",
+        lambda _path: DiskUsage(1024**3, 512 * 1024**2, 512 * 1024**2),
+    )
+
+    report = health.verificar_salud(strict=True)
+
+    assert report.estado == "healthy"
+    assert report.componentes["api_key"] is True
+
+
 @pytest.mark.parametrize("failed_component", ["storage", "logs"])
 def test_unhealthy_state_raises_critical_error_in_strict_mode(
     tmp_path: Path,
@@ -79,16 +100,18 @@ def test_unhealthy_state_raises_critical_error_in_strict_mode(
     monkeypatch.setattr(
         health.os,
         "access",
-        lambda path, _mode: not (
-            failed_component == "logs" and Path(path).name == "logs"
+        lambda path, _mode: (
+            not (failed_component == "logs" and Path(path).name == "logs")
         ),
     )
     monkeypatch.setattr(
         health.shutil,
         "disk_usage",
-        lambda _path: DiskUsage(1024**3, 1024**3, 0)
-        if failed_component == "storage"
-        else DiskUsage(1024**3, 512 * 1024**2, 512 * 1024**2),
+        lambda _path: (
+            DiskUsage(1024**3, 1024**3, 0)
+            if failed_component == "storage"
+            else DiskUsage(1024**3, 512 * 1024**2, 512 * 1024**2)
+        ),
     )
 
     with pytest.raises(CriticalError, match="Fallo crítico"):

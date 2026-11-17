@@ -39,6 +39,7 @@ Fase 01/
 *.sqlite3
 
 database/aethel.db
+database/aethel-context.key
 
 *.lock
 

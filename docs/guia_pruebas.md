@@ -28,7 +28,7 @@ python -m pip install -r requirements.txt
 ## 2. Configurar la clave
 
 1. Copia `.env.example` como `.env`.
-2. Edita `.env` y sustituye únicamente el valor de `AI_API_KEY`.
+2. Edita `.env` y configura el proveedor que quieras usar.
 3. No uses comillas adicionales y no compartas el archivo.
 
 Linux/macOS:
@@ -47,15 +47,18 @@ Configuración mínima:
 
 ```dotenv
 ENVIRONMENT=development
-AI_PROVIDER=gemini
+LLM_PROVIDER_ORDER=ollama,gemini,offline
 AI_API_KEY=tu_clave_sin_comillas
 AI_MODEL=gemini-3.8-flash
 AI_FALLBACK_MODELS=gemini-3.5-flash-lite,gemini-3.1-flash-lite
+OLLAMA_URL=http://127.0.0.1:11434
+OLLAMA_MODEL=qwen3:8b
 ```
 
-La clave debe tener permisos para generar contenido con al menos uno de los
-modelos configurados. La disponibilidad de modelos puede variar por cuenta,
-región y cuota.
+La clave solo es necesaria si `gemini` aparece en `LLM_PROVIDER_ORDER`.
+Para una prueba completamente local, usa `LLM_PROVIDER_ORDER=ollama,offline`,
+instala Ollama, inicia el servicio y descarga el modelo indicado con
+`ollama pull qwen3:8b`.
 
 ## 3. Ejecutar pruebas automáticas
 
@@ -74,7 +77,7 @@ En Windows PowerShell, sustituye `.venv/bin/python` por
 Resultado esperado actual:
 
 ```text
-87 passed
+105 passed
 ```
 
 ## 4. Probar la aplicación sin consumir API
@@ -115,6 +118,9 @@ Comprueba que:
 - los logs muestran el modelo, tokens y coste estimado;
 - si el modelo principal falla de forma recuperable, se intenta un fallback.
 
+Con `ollama,gemini,offline`, la primera respuesta normalmente será local y no
+consumirá cuota de Gemini. `/modelo` muestra el proveedor y la latencia.
+
 El presupuesto configurado en `src/main.py` es `$0.50`. Es un límite local
 acumulado para la ejecución y no una garantía de facturación gratuita del
 proveedor.
@@ -140,6 +146,35 @@ Get-Content logs\aethel.log -Wait
 ```
 
 Nunca pegues en un reporte el contenido de `.env` ni una API key.
+
+## Memoria persistente y cifrado opcional
+
+Para cifrar mensajes y resúmenes en SQLite, genera una clave una sola vez:
+
+```bash
+.venv/bin/python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+```
+
+Guárdala como `CONTEXT_ENCRYPTION_KEY` en `.env`, sin publicarla ni perderla.
+Al abrir una base existente por primera vez con una clave, la aplicación migra
+sus textos en claro a formato cifrado. Si se usa otra clave, o se quita la
+clave después de cifrar, el arranque se detiene para evitar corromper o
+interpretar incorrectamente el historial.
+También puedes ajustar:
+
+```dotenv
+CONTEXT_RETENTION_DAYS=30
+```
+
+Durante la sesión:
+
+```text
+/modelo
+/memoria
+/limpiar
+```
+
+`/limpiar` elimina la memoria de la sesión activa de SQLite.
 
 ## 7. Diagnóstico de errores
 
