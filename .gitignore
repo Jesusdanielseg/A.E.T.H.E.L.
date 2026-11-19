@@ -44,3 +44,5 @@ database/aethel-context.key
 
 # Apuntes y explicaciones locales
 explanations/
+
+.agents/
