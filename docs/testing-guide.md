@@ -77,7 +77,7 @@ En Windows PowerShell, sustituye `.venv/bin/python` por
 Resultado esperado actual:
 
 ```text
-105 passed
+111 passed
 ```
 
 ## 4. Probar la aplicación sin consumir API
@@ -120,6 +120,17 @@ Comprueba que:
 
 Con `ollama,gemini,offline`, la primera respuesta normalmente será local y no
 consumirá cuota de Gemini. `/modelo` muestra el proveedor y la latencia.
+
+Para comprobar la personalidad configurable, cambia temporalmente el modo en
+`.env` y reinicia:
+
+```dotenv
+PERSONALITY_MODE=codigo
+```
+
+El perfil se carga desde `prompts/persona.yaml`. Un YAML inválido o incompleto
+produce un error explícito de arranque; no se usa un perfil silencioso de
+respaldo.
 
 El presupuesto configurado en `src/main.py` es `$0.50`. Es un límite local
 acumulado para la ejecución y no una garantía de facturación gratuita del

@@ -32,6 +32,7 @@ class Settings:
         load_dotenv(project_root / ".env")
 
         default_db_path = project_root / "database" / "aethel.db"
+        default_persona_path = project_root / "prompts" / "persona.yaml"
 
         env_raw = os.getenv("ENVIRONMENT", "development")
         self.ENVIRONMENT: str = (env_raw or "development").strip().lower()
@@ -41,6 +42,14 @@ class Settings:
         if not db_path_obj.is_absolute():
             db_path_obj = project_root / db_path_obj
         self.DB_PATH: str = str(db_path_obj.resolve())
+        persona_raw = (os.getenv("PERSONALITY_PATH") or "").strip()
+        persona_path = Path(persona_raw or default_persona_path).expanduser()
+        if not persona_path.is_absolute():
+            persona_path = project_root / persona_path
+        self.PERSONALITY_PATH: str = str(persona_path.resolve())
+        self.PERSONALITY_MODE: str = (
+            (os.getenv("PERSONALITY_MODE", "enfoque") or "enfoque").strip().lower()
+        )
 
         self.AI_PROVIDER: str = (os.getenv("AI_PROVIDER", "gemini") or "gemini").strip()
         self.AI_API_KEY: str = (os.getenv("AI_API_KEY", "") or "").strip()
@@ -119,6 +128,11 @@ class Settings:
         if self.CONTEXT_RETENTION_DAYS <= 0:
             errores.append("CONTEXT_RETENTION_DAYS debe ser mayor que cero.")
 
+        if not self.PERSONALITY_PATH:
+            errores.append("PERSONALITY_PATH no puede estar vacío.")
+        if self.PERSONALITY_MODE not in {"enfoque", "codigo", "casual"}:
+            errores.append("PERSONALITY_MODE debe ser enfoque, codigo o casual.")
+
         valid_providers = {"gemini", "ollama", "offline"}
         if not self.LLM_PROVIDER_ORDER or any(
             provider not in valid_providers for provider in self.LLM_PROVIDER_ORDER
@@ -136,6 +150,8 @@ class Settings:
             "VERSION": self.VERSION,
             "ENVIRONMENT": self.ENVIRONMENT,
             "DB_PATH": self.DB_PATH,
+            "PERSONALITY_PATH": self.PERSONALITY_PATH,
+            "PERSONALITY_MODE": self.PERSONALITY_MODE,
             "AI_PROVIDER": self.AI_PROVIDER,
             "AI_API_KEY": "***" if self.AI_API_KEY else "",
             "AI_MODEL": self.AI_MODEL,

@@ -86,6 +86,17 @@ repositorio. Si una clave se expone, revócala y genera otra.
 requiere una API key. `CONTEXT_ENCRYPTION_KEY` cifra el historial local; si se
 pierde, el historial no puede recuperarse.
 
+La personalidad se configura externamente en
+[`prompts/persona.yaml`](./prompts/persona.yaml). Puedes cambiar el modo sin
+modificar Python:
+
+```dotenv
+PERSONALITY_MODE=enfoque
+```
+
+Consulta [`docs/personality.md`](./docs/personality.md) para conocer los
+modos, reglas de situaciones serias y pruebas del perfil.
+
 ## Ejecutar la interfaz
 
 Con el entorno virtual activado:
@@ -94,7 +105,7 @@ Con el entorno virtual activado:
 python -m src.main
 ```
 
-Para una guía paso a paso, consulta [`docs/guia_pruebas.md`](./docs/guia_pruebas.md).
+Para una guía paso a paso, consulta [`docs/testing-guide.md`](./docs/testing-guide.md).
 
 Prueba rápida:
 
@@ -142,8 +153,9 @@ src/
 │   ├── health.py       # Comprobaciones de salud
 │   ├── lifecycle.py    # Candado, señales y apagado
 │   └── logger.py       # Logging e IDs de petición
-├── context/              # Memoria, sanitización y SQLite
+├── context/              # Memoria, sanitización, personalidad y SQLite
 │   ├── manager.py
+│   ├── prompt_builder.py
 │   ├── sanitizer.py
 │   └── store.py
 ├── llm/                  # ABC, adaptadores y router
@@ -175,5 +187,5 @@ forman parte del flujo funcional actual.
 ## Documentación adicional
 
 Los documentos de arquitectura disponibles están en [`docs/`](./docs/).
-Las explicaciones locales y copias didácticas están en `explicaciones/`, una
+Las explicaciones locales y copias didácticas están en `explanations/`, una
 carpeta excluida de Git según la configuración del proyecto.

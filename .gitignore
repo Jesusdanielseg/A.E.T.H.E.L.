@@ -30,8 +30,7 @@ __pycache__/
 logs/
 
 #Ejercicios de practica python
-ejerciciosDePracticaPython_Fase01/
-Fase 01/
+phase-01/
 
 # Bases de datos locales
 *.db
@@ -44,4 +43,4 @@ database/aethel-context.key
 *.lock
 
 # Apuntes y explicaciones locales
-explicaciones/
+explanations/

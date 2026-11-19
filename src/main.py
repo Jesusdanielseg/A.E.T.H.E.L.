@@ -2,7 +2,7 @@ import logging
 import sys
 
 from src.context.manager import ContextManager
-from src.context.system_prompt import SYSTEM_PROMPT
+from src.context.prompt_builder import PersonaBuilder
 from src.core.config import config
 from src.core.controller import ControladorCentral
 from src.core.exceptions import CriticalError
@@ -68,9 +68,13 @@ def main() -> int:
         verificar_salud(strict=True)
         proveedor_llm = _crear_router_llm()
         presupuesto = GestorPresupuesto(limite_usd=0.50)
+        system_prompt = PersonaBuilder(
+            config.PERSONALITY_PATH,
+            modo=config.PERSONALITY_MODE,
+        ).build_system_prompt()
         contexto = ContextManager(
             database_path=config.DB_PATH,
-            system_prompt=SYSTEM_PROMPT,
+            system_prompt=system_prompt,
             summarizer=proveedor_llm,
             presupuesto=presupuesto,
             encryption_key=config.CONTEXT_ENCRYPTION_KEY or None,
