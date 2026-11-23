@@ -99,11 +99,13 @@ def test_cli_exits_cleanly_on_keyboard_interrupt_or_eof(
     assert output.endswith("\n")
 
 
+@pytest.mark.parametrize("exit_command", ["ExIt", "/salir", "/EXIT", "/quit"])
 def test_cli_exit_commands_are_case_insensitive(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
+    exit_command: str,
 ) -> None:
-    monkeypatch.setattr("builtins.input", lambda _prompt: "  ExIt ")
+    monkeypatch.setattr("builtins.input", lambda _prompt: f"  {exit_command} ")
 
     class UnexpectedController(ControladorCentral):
         def procesar_mensaje(self, _message: MensajeEntrada) -> RespuestaSalida:
@@ -111,7 +113,9 @@ def test_cli_exit_commands_are_case_insensitive(
 
     InterfazCLI(UnexpectedController(FakeProvider(), GestorPresupuesto(1.0))).ejecutar()
 
-    assert "está listo" in capsys.readouterr().out
+    output = capsys.readouterr().out
+    assert "está listo" in output
+    assert "A.E.T.H.E.L. cerrado." in output
 
 
 def test_termination_signal_during_input_exits_cli_and_releases_instance_lock(

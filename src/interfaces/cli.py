@@ -9,7 +9,9 @@ logger = logging.getLogger(__name__)
 class InterfazCLI:
     """Interfaz interna por consola para interactuar con A.E.T.H.E.L."""
 
-    COMANDOS_SALIDA: frozenset[str] = frozenset({"salir", "exit", "quit"})
+    COMANDOS_SALIDA: frozenset[str] = frozenset(
+        {"salir", "exit", "quit", "/salir", "/exit", "/quit"}
+    )
 
     def __init__(self, controlador: ControladorCentral) -> None:
         self.controlador = controlador
@@ -31,6 +33,7 @@ class InterfazCLI:
             comando = entrada.strip().lower() if entrada is not None else ""
             if entrada is None or comando in self.COMANDOS_SALIDA:
                 logger.info("Cerrando interfaz CLI por solicitud del usuario")
+                print("A.E.T.H.E.L. cerrado.", flush=True)
                 break
             if comando == "/memoria":
                 self._mostrar_memoria()
