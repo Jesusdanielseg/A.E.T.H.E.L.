@@ -1,4 +1,5 @@
 import logging
+import sqlite3
 import sys
 from pathlib import Path
 
@@ -46,6 +47,10 @@ def _crear_router_llm() -> LLMRouter:
                     model=config.OLLAMA_MODEL,
                     base_url=config.OLLAMA_URL,
                     timeout_seconds=config.OLLAMA_TIMEOUT_SECONDS,
+                    think=config.OLLAMA_THINK,
+                    num_ctx=config.OLLAMA_NUM_CTX,
+                    num_predict=config.OLLAMA_NUM_PREDICT,
+                    keep_alive=config.OLLAMA_KEEP_ALIVE,
                 )
             )
         elif provider_name == "offline":
@@ -69,10 +74,11 @@ def main() -> int:
     contexto: ContextManager | None = None
     exit_code = 0
     try:
+        config.validar()
         lifecycle = LifecycleManager()
         verificar_salud(strict=True)
         proveedor_llm = _crear_router_llm()
-        presupuesto = GestorPresupuesto(limite_usd=0.50)
+        presupuesto = GestorPresupuesto(limite_usd=config.LLM_BUDGET_USD)
         system_prompt = PersonaBuilder(
             config.PERSONALITY_PATH,
             modo=config.PERSONALITY_MODE,
@@ -103,6 +109,9 @@ def main() -> int:
         exit_code = 1
     except ValueError as exc:
         logger.error("Configuración inválida: %s", exc)
+        exit_code = 1
+    except sqlite3.Error as exc:
+        logger.error("Error de base de datos al iniciar A.E.T.H.E.L.: %s", exc)
         exit_code = 1
     except OSError as exc:
         logger.error("Error del sistema al iniciar A.E.T.H.E.L.: %s", exc)

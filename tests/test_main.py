@@ -1,4 +1,5 @@
 import logging
+import sqlite3
 
 import pytest
 
@@ -80,7 +81,7 @@ def test_main_checks_health_then_starts_cli_and_stops(
     assert controller_kwargs["proveedor_llm"] is not None
     presupuesto = controller_kwargs["presupuesto"]
     assert isinstance(presupuesto, GestorPresupuesto)
-    assert presupuesto.limite_usd == 0.50
+    assert presupuesto.limite_usd == main.config.LLM_BUDGET_USD
 
 
 @pytest.mark.parametrize(
@@ -90,6 +91,7 @@ def test_main_checks_health_then_starts_cli_and_stops(
         ("start", CriticalError("start failed"), 1),
         ("start", RuntimeError("instance already active"), 1),
         ("start", ValueError("invalid configuration"), 1),
+        ("start", sqlite3.OperationalError("database is locked"), 1),
         ("start", OSError("lock file unavailable"), 1),
     ],
 )
