@@ -1,7 +1,9 @@
 import logging
 from dataclasses import dataclass
 
+from src.context.manager import ContextManager
 from src.core.exceptions import RecoverableError
+from src.core.llm import GestorPresupuesto, ProveedorLLM
 from src.core.logger import establecer_request_id
 
 logger = logging.getLogger(__name__)
@@ -21,13 +23,23 @@ class RespuestaSalida:
 
     request_id: str
     contenido: str
-    simulada: bool = True
+    simulada: bool = False
 
 
 class ControladorCentral:
-    """Orquesta la validación, procesamiento y registro de cada interacción."""
+    """Orquesta validación, presupuesto y consulta al modelo."""
 
     MAX_CARACTERES: int = 2000
+
+    def __init__(
+        self,
+        proveedor_llm: ProveedorLLM,
+        presupuesto: GestorPresupuesto,
+        contexto: ContextManager | None = None,
+    ) -> None:
+        self.proveedor_llm = proveedor_llm
+        self.presupuesto = presupuesto
+        self.contexto = contexto
 
     def procesar_mensaje(self, mensaje: MensajeEntrada) -> RespuestaSalida:
         """Ejecuta el flujo completo de atención para un mensaje entrante."""
@@ -35,13 +47,34 @@ class ControladorCentral:
         logger.info("Mensaje recibido desde '%s'", mensaje.origen)
 
         texto_limpio = self._validar_mensaje(mensaje)
-        respuesta_texto = self._generar_respuesta_simulada(texto_limpio)
+        if texto_limpio.lower() == "ping":
+            return RespuestaSalida(
+                request_id=request_id,
+                contenido="pong (núcleo operativo)",
+                simulada=True,
+            )
+
+        self.presupuesto.verificar_disponibilidad()
+        if self.contexto is not None:
+            prompt = self.contexto.build_prompt(texto_limpio)
+            self.contexto.add_message("user", texto_limpio)
+        else:
+            prompt = texto_limpio
+        respuesta_llm = self.proveedor_llm.generar_respuesta(prompt)
+        self.presupuesto.registrar_uso(respuesta_llm)
+        if self.contexto is not None:
+            self.contexto.add_message("assistant", respuesta_llm.contenido)
+            self.contexto.compact(self.proveedor_llm)
 
         logger.info(
             "Respuesta generada correctamente (%d caracteres)",
-            len(respuesta_texto),
+            len(respuesta_llm.contenido),
         )
-        return RespuestaSalida(request_id=request_id, contenido=respuesta_texto)
+        return RespuestaSalida(
+            request_id=request_id,
+            contenido=respuesta_llm.contenido,
+            simulada=False,
+        )
 
     def _validar_mensaje(self, mensaje: MensajeEntrada) -> str:
         """Limpia y valida el contenido antes de procesarlo."""
@@ -53,9 +86,3 @@ class ControladorCentral:
                 f"El mensaje excede el límite de {self.MAX_CARACTERES} caracteres."
             )
         return texto
-
-    def _generar_respuesta_simulada(self, texto: str) -> str:
-        """Devuelve una respuesta de prueba sin consultar un modelo externo."""
-        if texto.lower() == "ping":
-            return "pong (núcleo operativo)"
-        return f"[A.E.T.H.E.L. - Simulación] Procesado: '{texto}'"
