@@ -44,6 +44,9 @@ class InterfazCLI:
             if comando == "/modelo":
                 self._mostrar_modelo()
                 continue
+            if comando == "/estado":
+                self._mostrar_estado()
+                continue
 
             try:
                 mensaje = MensajeEntrada(contenido=entrada, origen="cli")
@@ -73,5 +76,20 @@ class InterfazCLI:
     def _mostrar_modelo(self) -> None:
         provider = self.controlador.proveedor_llm
         name = getattr(provider, "last_provider", "") or provider.__class__.__name__
+        model = getattr(provider, "last_model", "") or "n/d"
         latency = getattr(provider, "last_latency_ms", 0.0)
-        print(f"[Modelo] {name} | latencia={latency:.1f} ms")
+        print(f"[Modelo] {name} ({model}) | latencia={latency:.1f} ms")
+
+    def _mostrar_estado(self) -> None:
+        provider = self.controlador.proveedor_llm
+        name = getattr(provider, "last_provider", "") or provider.__class__.__name__
+        model = getattr(provider, "last_model", "") or "n/d"
+        latency = getattr(provider, "last_latency_ms", 0.0)
+        presupuesto = self.controlador.presupuesto
+        print(
+            f"[Estado] proveedor={name} ({model}) | "
+            f"latencia={latency:.1f} ms | "
+            f"tokens={presupuesto.tokens_totales} | "
+            f"coste=${presupuesto.gasto_acumulado:.4f} / "
+            f"${presupuesto.limite_usd:.4f}"
+        )
