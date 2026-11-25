@@ -42,6 +42,16 @@ class PersonaBuilder:
         style = self.data["estilo"]
         response = self.data["respuesta"]
         security = self.data["seguridad"]
+        first_line = (
+            "Empieza con una respuesta directa en la primera línea."
+            if response["primera_linea_directa"]
+            else "No es obligatorio empezar con una respuesta directa."
+        )
+        brevity = (
+            "Sé breve por defecto; amplía solo si el usuario lo pide."
+            if response["brevedad_por_defecto"]
+            else "Puedes extenderte si aporta valor."
+        )
         lines = [
             f"Identidad: {identity['nombre']}.",
             f"Rol: {identity['rol']}",
@@ -61,8 +71,8 @@ class PersonaBuilder:
             *[f"- {item}" for item in style["situaciones_serias"]],
             "",
             "Formato de respuesta:",
-            f"- Primera línea directa: {response['primera_linea_directa']}.",
-            f"- Brevedad por defecto: {response['brevedad_por_defecto']}.",
+            f"- Primera línea: {first_line}",
+            f"- Brevedad: {brevity}",
             f"- Máximo recomendado: {response['maximo_recomendado_lineas']} líneas.",
             f"- Estructura: {'; '.join(response['estructura_preferida'])}.",
             f"- Código: {response['formato_codigo']}",
@@ -181,6 +191,13 @@ class PersonaBuilder:
         }
         if not required_response.issubset(response):
             raise PersonaConfigError("La sección respuesta está incompleta.")
+        if (
+            not isinstance(response["primera_linea_directa"], bool)
+            or not isinstance(response["brevedad_por_defecto"], bool)
+        ):
+            raise PersonaConfigError(
+                "primera_linea_directa y brevedad_por_defecto deben ser booleanos."
+            )
         if (
             not isinstance(response["maximo_recomendado_lineas"], int)
             or response["maximo_recomendado_lineas"] <= 0

@@ -14,13 +14,27 @@ def test_persona_prompt_contains_identity_style_and_serious_override() -> None:
     assert "Modo activo: enfoque." in prompt
     assert "Regla de situación seria:" in prompt
     assert "el humor" in prompt.lower()
-    assert "Como asistente de IA" in prompt
+    assert "Copiloto técnico" in prompt
 
 
 def test_persona_mode_can_be_overridden_without_editing_yaml() -> None:
     builder = PersonaBuilder(PERSONA_PATH)
 
     assert "Modo activo: codigo." in builder.build_system_prompt("codigo")
+
+
+def test_persona_renders_format_flags_as_natural_instructions() -> None:
+    prompt = PersonaBuilder(PERSONA_PATH).build_system_prompt()
+
+    assert "Primera línea directa: True" not in prompt
+    assert "Brevedad por defecto: True" not in prompt
+    assert "Empieza con una respuesta directa" in prompt
+    assert "Sé breve por defecto" in prompt
+    assert "No inventes listados de archivos" in prompt
+    assert "No inventes precios" in prompt
+    assert "No puedo ver tu escritorio" in prompt
+    assert "Reconoce los datos que el usuario comparte" in prompt
+    assert "Operativa." not in prompt
 
 
 @pytest.mark.parametrize("mode", ["", "irreverente", "serio"])
