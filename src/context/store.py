@@ -33,7 +33,11 @@ class ConversationStore:
         self.retention_days = retention_days
         self._lock = RLock()
         self._cipher = self._build_cipher(encryption_key)
-        self._create_schema()
+        try:
+            self._create_schema()
+        except Exception:
+            self.connection.close()
+            raise
 
     @staticmethod
     def _build_cipher(key: str | None) -> Fernet | None:
@@ -84,13 +88,16 @@ class ConversationStore:
             );
             CREATE TABLE IF NOT EXISTS conversation_messages (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                session_id TEXT NOT NULL REFERENCES conversation_sessions(id),
+                session_id TEXT NOT NULL
+                    REFERENCES conversation_sessions(id) ON DELETE CASCADE,
                 role TEXT NOT NULL CHECK (role IN ('user', 'assistant', 'system')),
                 content TEXT NOT NULL,
                 created_at TEXT NOT NULL
             );
             CREATE INDEX IF NOT EXISTS idx_messages_session_time
                 ON conversation_messages(session_id, created_at, id);
+            CREATE INDEX IF NOT EXISTS idx_sessions_archived_activity
+                ON conversation_sessions(archived, last_activity_at);
             """
             )
             self.connection.execute(
@@ -238,6 +245,18 @@ class ConversationStore:
 
     def _purge_archived(self) -> None:
         cutoff = (self._now() - timedelta(days=self.retention_days)).isoformat()
+        # Se eliminan primero los mensajes para que la purga funcione también
+        # con bases creadas antes de añadir ON DELETE CASCADE.
+        self.connection.execute(
+            """
+            DELETE FROM conversation_messages
+            WHERE session_id IN (
+                SELECT id FROM conversation_sessions
+                WHERE archived = 1 AND last_activity_at < ?
+            )
+            """,
+            (cutoff,),
+        )
         self.connection.execute(
             """
             DELETE FROM conversation_sessions

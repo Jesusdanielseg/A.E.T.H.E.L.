@@ -101,9 +101,14 @@ class ContextManager:
         fragment = "\n".join(
             f"{message.role}: {message.content}" for message in old_messages
         )
+        previous_summary = (
+            f"Resumen previo que debes conservar:\n{self.summary}\n\n"
+            if self.summary
+            else ""
+        )
         prompt = (
-            "Resume brevemente los hechos y preferencias importantes de esta "
-            f"conversación:\n{fragment}"
+            f"{previous_summary}Resume brevemente los hechos y preferencias "
+            f"importantes de esta conversación:\n{fragment}"
         )
         try:
             if self.presupuesto is not None:

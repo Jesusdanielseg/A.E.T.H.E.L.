@@ -86,12 +86,72 @@ def test_context_compacts_old_messages_with_router(tmp_path) -> None:
     context.close()
 
 
+def test_compaction_includes_previous_summary_in_prompt(tmp_path) -> None:
+    prompts: list[str] = []
+
+    class RecordingSummarizer:
+        def generar_respuesta(self, prompt: str) -> RespuestaLLM:
+            prompts.append(prompt)
+            return RespuestaLLM("resumen nuevo", "offline", 1, 1, 0.0)
+
+    summarizer = RecordingSummarizer()
+    context = ContextManager(
+        tmp_path / "memory.db",
+        "Regla permanente",
+        max_messages=4,
+        summarizer=summarizer,
+    )
+    for index in range(4):
+        context.add_message("user", f"mensaje {index}")
+    context.summary = "El proyecto se llama Orion y usa Kubuntu."
+    context.add_message("user", "mensaje 4")
+
+    assert "Orion" in prompts[0]
+    assert "Kubuntu" in prompts[0]
+    context.close()
+
+
 @pytest.mark.parametrize("role", ["invalid", "tool"])
 def test_context_rejects_unknown_roles(tmp_path, role: str) -> None:
     context = ContextManager(tmp_path / "memory.db", "Regla")
     with pytest.raises(ValueError, match="rol"):
         context.add_message(role, "contenido")
     context.close()
+
+
+def test_retention_purges_archived_sessions_with_messages(tmp_path) -> None:
+    database = tmp_path / "memory.db"
+    context = ContextManager(database, "Regla", retention_days=1)
+    context.add_message("user", "mensaje que debe purgarse")
+    archived_session = context.session_id
+    context.close()
+
+    with sqlite3.connect(database) as connection:
+        connection.execute(
+            """
+            UPDATE conversation_sessions
+            SET archived = 1, last_activity_at = '2020-01-01T00:00:00+00:00'
+            WHERE id = ?
+            """,
+            (archived_session,),
+        )
+        connection.commit()
+
+    reopened = ContextManager(database, "Regla", retention_days=1)
+    reopened.close()
+
+    with sqlite3.connect(database) as connection:
+        message_count = connection.execute(
+            "SELECT COUNT(*) FROM conversation_messages WHERE session_id = ?",
+            (archived_session,),
+        ).fetchone()[0]
+        session_count = connection.execute(
+            "SELECT COUNT(*) FROM conversation_sessions WHERE id = ?",
+            (archived_session,),
+        ).fetchone()[0]
+
+    assert message_count == 0
+    assert session_count == 0
 
 
 def test_context_starts_new_session_after_timeout(tmp_path) -> None:
