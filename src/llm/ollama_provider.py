@@ -5,13 +5,18 @@ from src.llm.base import BaseLLMProvider, ModelResponse, ProviderError
 
 
 class OllamaProvider(BaseLLMProvider):
-    """Adaptador opcional para una instancia local de Ollama."""
+    """Adaptador local de Ollama, con pensamiento desactivado por defecto."""
 
     def __init__(
         self,
         model: str,
         base_url: str = "http://127.0.0.1:11434",
         timeout_seconds: int = 30,
+        *,
+        think: bool = False,
+        num_ctx: int = 8192,
+        num_predict: int = 512,
+        keep_alive: str = "30m",
     ) -> None:
         if not model.strip():
             raise ValueError("El modelo de Ollama no puede estar vacío.")
@@ -19,16 +24,39 @@ class OllamaProvider(BaseLLMProvider):
             raise TypeError("El timeout de Ollama debe ser un entero.")
         if timeout_seconds <= 0:
             raise ValueError("El timeout de Ollama debe ser mayor que cero.")
+        if not isinstance(think, bool):
+            raise TypeError("think debe ser booleano.")
+        for name, value in (("num_ctx", num_ctx), ("num_predict", num_predict)):
+            if not isinstance(value, int) or isinstance(value, bool):
+                raise TypeError(f"{name} debe ser un entero.")
+            if value <= 0:
+                raise ValueError(f"{name} debe ser mayor que cero.")
+        if not keep_alive.strip():
+            raise ValueError("keep_alive no puede estar vacío.")
         self.model = model.strip()
         self.base_url = base_url.rstrip("/")
         self.timeout_seconds = timeout_seconds
+        self.think = think
+        self.num_ctx = num_ctx
+        self.num_predict = num_predict
+        self.keep_alive = keep_alive.strip()
 
     def generate_response(
         self, prompt: str, context: str | None = None
     ) -> ModelResponse:
         del context
         payload = json.dumps(
-            {"model": self.model, "prompt": prompt, "stream": False}
+            {
+                "model": self.model,
+                "prompt": prompt,
+                "stream": False,
+                "think": self.think,
+                "keep_alive": self.keep_alive,
+                "options": {
+                    "num_ctx": self.num_ctx,
+                    "num_predict": self.num_predict,
+                },
+            }
         ).encode("utf-8")
         http_request = request.Request(
             f"{self.base_url}/api/generate",

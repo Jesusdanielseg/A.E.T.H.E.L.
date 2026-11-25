@@ -16,6 +16,7 @@ class LLMRouter(BaseLLMProvider):
         if not self.providers:
             raise ValueError("El router necesita al menos un proveedor.")
         self.last_provider = ""
+        self.last_model = ""
         self.last_latency_ms = 0.0
 
     def generate_response(self, prompt: str, context: str | None = None):
@@ -34,6 +35,7 @@ class LLMRouter(BaseLLMProvider):
                 )
             else:
                 self.last_provider = response.provider
+                self.last_model = response.model
                 self.last_latency_ms = (time.perf_counter() - started) * 1000
                 logger.info(
                     "Proveedor LLM seleccionado: %s (%s) en %.1f ms",

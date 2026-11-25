@@ -37,6 +37,8 @@ def test_router_uses_next_provider_after_normalized_failure() -> None:
 
     assert response.modelo == "offline-rules"
     assert response.coste_usd == 0.0
+    assert router.last_provider == "offline"
+    assert router.last_model == "offline-rules"
 
 
 def test_router_rejects_empty_provider_list() -> None:
@@ -82,5 +84,12 @@ def test_ollama_provider_posts_prompt_and_normalizes_response(
     assert captured == {
         "url": "http://127.0.0.1:11434/api/generate",
         "timeout": 30,
-        "body": {"model": "llama3.2", "prompt": "hola", "stream": False},
+        "body": {
+            "model": "llama3.2",
+            "prompt": "hola",
+            "stream": False,
+            "think": False,
+            "keep_alive": "30m",
+            "options": {"num_ctx": 8192, "num_predict": 512},
+        },
     }
