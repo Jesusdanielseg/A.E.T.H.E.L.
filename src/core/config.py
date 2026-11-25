@@ -1,3 +1,4 @@
+import math
 import os
 from pathlib import Path
 from typing import IO, ClassVar
@@ -16,6 +17,30 @@ except ModuleNotFoundError:  # pragma: no cover
     ) -> bool:
         del dotenv_path, stream, verbose, override, interpolate, encoding
         return False
+
+
+def _env_int(name: str, default: int) -> int:
+    """Lee un entero de entorno; devuelve 0 si el valor no es válido."""
+    raw = os.getenv(name)
+    if raw is None or not raw.strip():
+        return default
+    try:
+        return int(raw)
+    except ValueError:
+        return 0
+
+
+def _env_bool(name: str, default: bool) -> bool:
+    """Interpreta valores habituales de verdad sin aceptar falsos positivos."""
+    raw = os.getenv(name)
+    if raw is None or not raw.strip():
+        return default
+    normalized = raw.strip().lower()
+    if normalized in {"1", "true", "yes", "on", "si", "sí"}:
+        return True
+    if normalized in {"0", "false", "no", "off"}:
+        return False
+    return default
 
 
 class Settings:
@@ -51,7 +76,6 @@ class Settings:
             (os.getenv("PERSONALITY_MODE", "enfoque") or "enfoque").strip().lower()
         )
 
-        self.AI_PROVIDER: str = (os.getenv("AI_PROVIDER", "gemini") or "gemini").strip()
         self.AI_API_KEY: str = (os.getenv("AI_API_KEY", "") or "").strip()
         self.AI_MODEL: str = (
             os.getenv("AI_MODEL", "gemini-3.8-flash") or "gemini-3.8-flash"
@@ -65,26 +89,29 @@ class Settings:
             or "http://127.0.0.1:11434"
         ).strip()
         self.OLLAMA_MODEL: str = (
-            os.getenv("OLLAMA_MODEL", "llama3.2") or "llama3.2"
+            os.getenv("OLLAMA_MODEL", "gemma3:4b") or "gemma3:4b"
         ).strip()
-        ollama_timeout_raw = os.getenv("OLLAMA_TIMEOUT_SECONDS", "120") or "120"
-        try:
-            self.OLLAMA_TIMEOUT_SECONDS: int = int(ollama_timeout_raw)
-        except ValueError:
-            self.OLLAMA_TIMEOUT_SECONDS = 0
+        self.OLLAMA_THINK: bool = _env_bool("OLLAMA_THINK", False)
+        self.OLLAMA_NUM_CTX: int = _env_int("OLLAMA_NUM_CTX", 8192)
+        self.OLLAMA_NUM_PREDICT: int = _env_int("OLLAMA_NUM_PREDICT", 512)
+        self.OLLAMA_KEEP_ALIVE: str = (
+            os.getenv("OLLAMA_KEEP_ALIVE", "30m") or "30m"
+        ).strip()
+        self.OLLAMA_TIMEOUT_SECONDS: int = _env_int("OLLAMA_TIMEOUT_SECONDS", 120)
         provider_order_raw = (
-            os.getenv("LLM_PROVIDER_ORDER", "gemini,ollama,offline") or ""
+            os.getenv("LLM_PROVIDER_ORDER", "ollama,gemini,offline") or ""
         )
         self.LLM_PROVIDER_ORDER: tuple[str, ...] = tuple(
             provider.strip().lower()
             for provider in provider_order_raw.split(",")
             if provider.strip()
         )
-        retention_raw = os.getenv("CONTEXT_RETENTION_DAYS", "30") or "30"
+        budget_raw = (os.getenv("LLM_BUDGET_USD", "0.50") or "0.50").strip()
         try:
-            self.CONTEXT_RETENTION_DAYS: int = int(retention_raw)
+            self.LLM_BUDGET_USD: float = float(budget_raw)
         except ValueError:
-            self.CONTEXT_RETENTION_DAYS = 0
+            self.LLM_BUDGET_USD = -1.0
+        self.CONTEXT_RETENTION_DAYS: int = _env_int("CONTEXT_RETENTION_DAYS", 30)
         self.CONTEXT_ENCRYPTION_KEY: str = (
             os.getenv("CONTEXT_ENCRYPTION_KEY", "") or ""
         ).strip()
@@ -116,14 +143,22 @@ class Settings:
         ):
             errores.append(f"Falta AI_API_KEY para el entorno '{self.ENVIRONMENT}'.")
 
-        if not self.AI_PROVIDER:
-            errores.append("AI_PROVIDER no puede estar vacío.")
-
         if "gemini" in self.LLM_PROVIDER_ORDER and not self.AI_MODEL:
             errores.append("AI_MODEL no puede estar vacío.")
 
+        if not self.OLLAMA_MODEL:
+            errores.append("OLLAMA_MODEL no puede estar vacío.")
         if self.OLLAMA_TIMEOUT_SECONDS <= 0:
             errores.append("OLLAMA_TIMEOUT_SECONDS debe ser mayor que cero.")
+        if self.OLLAMA_NUM_CTX <= 0:
+            errores.append("OLLAMA_NUM_CTX debe ser mayor que cero.")
+        if self.OLLAMA_NUM_PREDICT <= 0:
+            errores.append("OLLAMA_NUM_PREDICT debe ser mayor que cero.")
+        if not self.OLLAMA_KEEP_ALIVE:
+            errores.append("OLLAMA_KEEP_ALIVE no puede estar vacío.")
+
+        if not math.isfinite(self.LLM_BUDGET_USD) or self.LLM_BUDGET_USD < 0:
+            errores.append("LLM_BUDGET_USD debe ser un número finito no negativo.")
 
         if self.CONTEXT_RETENTION_DAYS <= 0:
             errores.append("CONTEXT_RETENTION_DAYS debe ser mayor que cero.")
@@ -152,14 +187,18 @@ class Settings:
             "DB_PATH": self.DB_PATH,
             "PERSONALITY_PATH": self.PERSONALITY_PATH,
             "PERSONALITY_MODE": self.PERSONALITY_MODE,
-            "AI_PROVIDER": self.AI_PROVIDER,
             "AI_API_KEY": "***" if self.AI_API_KEY else "",
             "AI_MODEL": self.AI_MODEL,
             "AI_FALLBACK_MODELS": ",".join(self.AI_FALLBACK_MODELS),
             "OLLAMA_URL": self.OLLAMA_URL,
             "OLLAMA_MODEL": self.OLLAMA_MODEL,
+            "OLLAMA_THINK": str(self.OLLAMA_THINK).lower(),
+            "OLLAMA_NUM_CTX": str(self.OLLAMA_NUM_CTX),
+            "OLLAMA_NUM_PREDICT": str(self.OLLAMA_NUM_PREDICT),
+            "OLLAMA_KEEP_ALIVE": self.OLLAMA_KEEP_ALIVE,
             "OLLAMA_TIMEOUT_SECONDS": str(self.OLLAMA_TIMEOUT_SECONDS),
             "LLM_PROVIDER_ORDER": ",".join(self.LLM_PROVIDER_ORDER),
+            "LLM_BUDGET_USD": str(self.LLM_BUDGET_USD),
             "CONTEXT_RETENTION_DAYS": str(self.CONTEXT_RETENTION_DAYS),
             "CONTEXT_ENCRYPTION_KEY": "***" if self.CONTEXT_ENCRYPTION_KEY else "",
         }
