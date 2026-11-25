@@ -8,8 +8,8 @@ valida y transforma mediante
 ## Integración
 
 `src/main.py` carga el perfil mediante `PersonaBuilder` y entrega el prompt
-resultante a `ContextManager`. El router no conoce la personalidad: Gemini,
-Ollama y offline reciben el mismo prompt final. El perfil se compone una vez
+resultante a `ContextManager`. El router no conoce la personalidad: Ollama,
+Gemini y offline reciben el mismo prompt final. El perfil se compone una vez
 durante el arranque y permanece separado del historial dinámico.
 
 Variables opcionales:

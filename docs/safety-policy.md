@@ -3,6 +3,13 @@
 
 *Política Integral de Seguridad, Privacidad, Permisos, Control de Autonomía y Recuperación*
 
+> **Estado (Fase 04):** este documento describe la política objetivo. Lo
+> implementado hoy se limita a variables de entorno para secretos, saneamiento
+> del historial, cifrado Fernet opcional, límite de presupuesto y separación
+> entre el modelo y la ejecución local. La matriz de permisos, las
+> herramientas, el sandbox, la auditoría persistente, el kill switch y los
+> respaldos cifrados están planificados y **no existen todavía**.
+
 ## 1. Principios Arquitectónicos de Seguridad
 
 * **Principio de Mínimo Privilegio (PoLP):** Ningún módulo, componente, interfaz o herramienta del sistema poseerá más privilegios de los estrictamente necesarios para cumplir su función en un momento dado. Las credenciales, el acceso a directorios y los alcances de red estarán compartimentados.
@@ -53,4 +60,4 @@ Para gobernar la autonomía del sistema, las operaciones se clasifican en tres c
 
 * **Registro de Auditoría Persistente (Logs de Seguridad):** El sistema mantendrá un registro detallado e imborrable en disco de todas las operaciones de Nivel 2 y Nivel 3 ejecutadas, especificando la marca temporal, la herramienta invocada, los parámetros desensibilizados y el resultado devuelto.
 * **Botón de Pánico / Parada de Emergencia (Kill Switch):** Existirá un mecanismo rápido y accesible (a nivel de proceso y de interfaz) para detener de forma fulminante cualquier hilo de ejecución en segundo plano, tarea automatizada o bucle de razonamiento descontrolado, revocando temporalmente los permisos activos del sistema.
-* **Procedimientos de Recuperación y Respalduros:** Se programarán copias de seguridad cifradas periódicas de la base de datos de memoria y configuraciones críticas, acompañadas de un procedimiento documentado de restauración ante fallos catastróficos del sistema operativo o el hardware.
+* **Procedimientos de Recuperación y Respaldos:** Se programarán copias de seguridad cifradas periódicas de la base de datos de memoria y configuraciones críticas, acompañadas de un procedimiento documentado de restauración ante fallos catastróficos del sistema operativo o el hardware.

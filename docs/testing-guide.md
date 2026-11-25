@@ -12,7 +12,7 @@ python3 --version
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
+python -m pip install -r requirements-dev.txt
 ```
 
 Windows PowerShell:
@@ -22,7 +22,7 @@ py --version
 py -m venv .venv
 .venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
+python -m pip install -r requirements-dev.txt
 ```
 
 ## 2. Configurar la clave
@@ -48,17 +48,26 @@ Configuración mínima:
 ```dotenv
 ENVIRONMENT=development
 LLM_PROVIDER_ORDER=ollama,gemini,offline
+OLLAMA_URL=http://127.0.0.1:11434
+OLLAMA_MODEL=gemma3:4b
+OLLAMA_THINK=false
+OLLAMA_NUM_CTX=8192
+OLLAMA_NUM_PREDICT=512
+OLLAMA_KEEP_ALIVE=30m
 AI_API_KEY=tu_clave_sin_comillas
 AI_MODEL=gemini-3.8-flash
 AI_FALLBACK_MODELS=gemini-3.5-flash-lite,gemini-3.1-flash-lite
-OLLAMA_URL=http://127.0.0.1:11434
-OLLAMA_MODEL=qwen3:8b
+LLM_BUDGET_USD=0.50
 ```
 
 La clave solo es necesaria si `gemini` aparece en `LLM_PROVIDER_ORDER`.
-Para una prueba completamente local, usa `LLM_PROVIDER_ORDER=ollama,offline`,
-instala Ollama, inicia el servicio y descarga el modelo indicado con
-`ollama pull qwen3:8b`.
+Para una prueba completamente local, usa `LLM_PROVIDER_ORDER=ollama,offline`
+y comprueba con `ollama list` que el modelo indicado ya está instalado. No es
+necesario descargar otro modelo para ejecutar los tests.
+
+Si el shell exporta `OLLAMA_MODEL`, ese valor tiene prioridad sobre `.env`.
+Para probar el modelo del archivo, ejecuta `env -u OLLAMA_MODEL python -m
+src.main` o `OLLAMA_MODEL=gemma3:4b python -m src.main`.
 
 ## 3. Ejecutar pruebas automáticas
 
@@ -77,7 +86,7 @@ En Windows PowerShell, sustituye `.venv/bin/python` por
 Resultado esperado actual:
 
 ```text
-111 passed
+125 passed
 ```
 
 ## 4. Probar la aplicación sin consumir API
@@ -100,8 +109,8 @@ Resultado esperado:
 pong (núcleo operativo)
 ```
 
-`ping` no consulta Gemini ni registra consumo. Después escribe `salir` para
-cerrar la CLI.
+`ping` no consulta ningún proveedor ni registra consumo. Después escribe
+`salir` para cerrar la CLI.
 
 ## 5. Probar una consulta real
 
@@ -119,7 +128,17 @@ Comprueba que:
 - si el modelo principal falla de forma recuperable, se intenta un fallback.
 
 Con `ollama,gemini,offline`, la primera respuesta normalmente será local y no
-consumirá cuota de Gemini. `/modelo` muestra el proveedor y la latencia.
+consumirá cuota de Gemini. `/modelo` muestra el proveedor, el modelo y la
+latencia; `/estado` añade tokens y coste acumulado.
+
+El modelo por defecto es `gemma3:4b`. En el hardware de referencia usa unos
+2.9 GB de VRAM y responde en ~0.6-2.2 s en caliente para preguntas simples; un
+diagnóstico de 5 pasos tarda ~6-10 s. La primera carga tarda ~9-14 s.
+`OLLAMA_NUM_CTX` y `OLLAMA_NUM_PREDICT` acotan contexto y salida;
+`OLLAMA_NUM_PREDICT=512` mantiene la latencia controlada. Si usas un modelo
+Qwen3, mantén `OLLAMA_THINK=false`. Los modelos Qwen3 de 4B probados en esta
+versión de Ollama pueden seguir mostrando razonamiento interno; verifica la
+salida antes de adoptarlos.
 
 Para comprobar la personalidad configurable, cambia temporalmente el modo en
 `.env` y reinicia:
@@ -132,9 +151,9 @@ El perfil se carga desde `prompts/persona.yaml`. Un YAML inválido o incompleto
 produce un error explícito de arranque; no se usa un perfil silencioso de
 respaldo.
 
-El presupuesto configurado en `src/main.py` es `$0.50`. Es un límite local
-acumulado para la ejecución y no una garantía de facturación gratuita del
-proveedor.
+El presupuesto se configura con `LLM_BUDGET_USD` (por defecto `$0.50`). Es un
+límite local acumulado para la ejecución y no una garantía de facturación
+gratuita del proveedor.
 
 ## 6. Revisar logs
 
@@ -181,6 +200,7 @@ Durante la sesión:
 
 ```text
 /modelo
+/estado
 /memoria
 /limpiar
 ```
@@ -207,12 +227,28 @@ modelos fallback y vuelve a intentar más tarde.
 ### El presupuesto está agotado
 
 La aplicación bloquea nuevos mensajes cuando el gasto acumulado alcanza el
-límite local. Reiniciar la aplicación reinicia el acumulador actual; para
-cambiar el límite modifica `GestorPresupuesto(limite_usd=0.50)` de forma
-consciente.
+límite local. Reiniciar la aplicación reinicia el acumulador actual. Para
+cambiar el límite, ajusta `LLM_BUDGET_USD` en `.env`.
 
 ## 8. Cierre seguro
 
 Escribe `salir`, `exit` o `quit`. También puedes usar Ctrl+C o Ctrl+D. La
 aplicación libera el candado de instancia y restaura los manejadores de
 señales antes de terminar.
+
+## 9. Evaluación inicial 04.5
+
+El protocolo completo está en [`evaluation-04.md`](./evaluation-04.md). Para
+medir latencia y coste usa `/estado` después de cada respuesta. Los casos
+deterministas viven en `tests/test_evaluation_04.py`; las pruebas con modelos
+reales se registran en la tabla de resultados del documento de evaluación.
+
+Antes de cerrar la fase, ejecuta:
+
+```bash
+.venv/bin/python -m pytest -q
+.venv/bin/python -m ruff check src tests
+.venv/bin/python -m mypy src tests
+```
+
+Y comprueba que el número de tests coincide con el documentado.

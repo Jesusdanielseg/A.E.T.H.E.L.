@@ -1,6 +1,6 @@
 # A.E.T.H.E.L.
 
-*Adaptive Engine for Text, Hearing, and Everyday Learning*
+*Automated Execution & Technical Handling Environment Logic*
 
 ## 1. Misión Principal
 
